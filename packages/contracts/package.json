@@ -1,0 +1,30 @@
+{
+  "name": "maci-contracts",
+  "scripts": {
+    "test": "hardhat test",
+    "build": "hardhat compile",
+    "node": "hardhat node",
+    "typechain": "hardhat typechain"
+  },
+  "dependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.4",
+    "@openzeppelin/contracts": "^4.9.3",
+    "chai": "^4.3.8",
+    "ethers": "6",
+    "hardhat": "2.12.6",
+    "solmate": "^6.2.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.3.6",
+    "@types/chai-as-promised": "^7.1.6",
+    "@types/jest": "^29.5.4",
+    "@types/mocha": "^10.0.1",
+    "chai-as-promised": "^7.1.1",
+    "ts-node": "^10.9.1",
+    "typechain": "^8.3.1",
+    "typescript": "^5.2.2"
+  }
+}

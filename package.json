@@ -1,0 +1,7 @@
+{
+  "name": "maci-refactor",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}
