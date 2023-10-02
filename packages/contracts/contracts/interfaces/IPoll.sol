@@ -5,21 +5,19 @@ import { IPubKey } from "../DomainObjs.sol";
 import { Params } from "../Params.sol";
 
 /**
- * @title IPollFactory
+ * @title IPoll
  * @author PSE
- * @notice IPollFactory is an interface for the PollFactory contract
+ * @notice IPoll is an interface for the Poll contract
  */
-interface IPollFactory {
-    function createNewInstance(
-        address owner,
-        address accQueueFactory,
+interface IPoll {
+    function initialize(
+        address _owner,
         address _messageProcessorAddress,
         uint256 _duration,
         Params.MaxValues memory _maxValues,
         Params.TreeDepths memory _treeDepths,
         Params.BatchSizes memory _batchSizes,
         IPubKey.PubKey memory _coordinatorPubKey,
-        address _maci,
-        address _topupCredit
-    ) external returns (address clone);
+        Params.ExtContracts memory _extContracts
+    ) external;
 }

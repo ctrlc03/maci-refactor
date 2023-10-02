@@ -4,7 +4,9 @@
     "test": "hardhat test",
     "build": "hardhat compile",
     "node": "hardhat node",
-    "typechain": "hardhat typechain"
+    "typechain": "hardhat typechain",
+    "deploy:local": "hardhat run ./scripts/deploy.ts --network hardhat",
+    "deploy:mainnet": "hardhat run ./scripts/deploy.ts --network mainnet"
   },
   "dependencies": {
     "@nomicfoundation/hardhat-ethers": "^3.0.4",

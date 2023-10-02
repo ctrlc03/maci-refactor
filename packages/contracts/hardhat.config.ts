@@ -19,7 +19,10 @@ const config: HardhatUserConfig = {
 		hardhat: {
 			chainId: 1337,
 			accounts: { count: 30, mnemonic: WALLET_MNEMONIC }
-		}
+		},
+		// mainnet: {
+		// 	chainId: 1
+		// }
 	},
 	paths: {
 		tests: "./test",

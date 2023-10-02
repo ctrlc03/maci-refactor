@@ -12,4 +12,5 @@ interface IAccQueue {
     function mergeSubRoots(uint256 _numSrQueueOps) external;
     function merge(uint256 _stateTreeDepth) external returns (uint256);
     function treeMerged() external returns (bool);
+    function enqueue(uint256 _leaf) external returns (uint256);
 }

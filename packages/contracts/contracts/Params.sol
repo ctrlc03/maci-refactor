@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import { IVkRegistry } from "./interfaces/IVkRegistry.sol";
+import { IMaci } from "./interfaces/IMaci.sol";
+import { IAccQueue } from "./interfaces/IAccQueue.sol";
+import { ITopupCredit } from "./interfaces/ITopupCredit.sol";
+
 /**
  * @title Params
  * @author PSE
@@ -25,5 +30,13 @@ contract Params {
     struct MaxValues {
         uint256 maxMessages;
         uint256 maxVoteOptions;
+    }
+
+    struct ExtContracts {
+        IVkRegistry vkRegistry;
+        IMaci maci;
+        IAccQueue messageAq;
+        IAccQueue deactivatedKeysAq;
+        ITopupCredit topupCredit;
     }
 }

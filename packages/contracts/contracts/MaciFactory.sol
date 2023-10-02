@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
-import { IOwned } from "./interfaces/IOwned.sol";
 import { IMaci } from "./interfaces/IMaci.sol";
 
 /**
@@ -48,9 +47,6 @@ contract MaciFactory {
     ) public returns (address clone) {
         // Deploy
         clone = Clones.clone(maciTemplate);
-
-        // transfer ownership to the caller
-        IOwned(clone).transferOwnership(_pollOwner);
         
         // Initialize
         IMaci(clone).initialize(

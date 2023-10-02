@@ -3,7 +3,6 @@ pragma solidity ^0.8.19;
 
 import { Owned } from "solmate/src/auth/Owned.sol";
 import { InitialVoiceCreditProxy } from "./voiceCredits/InitialVoiceCreditProxy.sol";
-import { Poll } from "./Poll.sol";
 import { VkRegistry } from "./VkRegistry.sol";
 import { IPubKey } from "./DomainObjs.sol";
 import { IPollFactory } from "./interfaces/IPollFactory.sol";
@@ -14,6 +13,7 @@ import { ISignUpGatekeeperFactory } from "./interfaces/ISignUpGatekeeperFactory.
 import { IVkRegistryFactory } from "./interfaces/IVkRegistryFactory.sol";
 import { Hasher } from "./crypto/Hasher.sol";
 import { Params } from "./Params.sol";
+import { IPoll } from "./interfaces/IPoll.sol";
 
 /**
  * @title MACI
@@ -27,7 +27,7 @@ contract MACI is Owned, IPubKey, Hasher, Params {
     uint256 nextPollId;
 
     /// @notice pollId => Poll
-    mapping(uint256 => Poll) polls;
+    mapping(uint256 => IPoll) polls;
 
     /// @notice how many voters signed up
     uint256 public numSignUps;
@@ -67,25 +67,11 @@ contract MACI is Owned, IPubKey, Hasher, Params {
     uint8 internal constant STATE_TREE_ARITY = 5;
     uint8 internal constant MESSAGE_TREE_ARITY = 5;
 
-    //// The hash of a blank state leaf
+    /// @notice The hash of a blank state leaf
     uint256 internal constant BLANK_STATE_LEAF_HASH =
         uint256(
             6769006970205099520508948723718471724660867171122235270773600567925038008762
         );
-
-
-    /// @notice we keep the contract state in a enum 
-    /// @dev SIGNUP -> Period where users can sign up
-    /// @dev DEACTIVATION_PERIOD -> Period where users can de-activate their keys
-    /// @dev ROUND_STARTED -> Period where users can send their ballots
-    enum State {
-        SIGNUP,
-        DEACTIVATION_PERIOD,
-        ROUND_STARTED
-    }
-
-    /// @notice the state of the contract
-    State public state;
 
     /// @notice Events 
     event Init(VkRegistry _vkRegistry);
@@ -141,9 +127,6 @@ contract MACI is Owned, IPubKey, Hasher, Params {
 
         /// @notice set the owner 
         owner = _owner;
-
-        /// @notice set the state to SIGNUP
-        state = State.SIGNUP;
 
         /// @notice store the poll factory so we can use it later to create new polls
         pollFactory = IPollFactory(_pollFactory);
@@ -203,7 +186,7 @@ contract MACI is Owned, IPubKey, Hasher, Params {
             nextPollId++;
         }
 
-        // if any polls were deployed before, the state tree must have been merged before 
+        /// @notice if any polls were deployed before, the state tree must have been merged before 
         // a new poll can be deployed
         if (pollId > 0 && !stateAq.treeMerged()) revert PollNotCompleted();
 
@@ -214,23 +197,23 @@ contract MACI is Owned, IPubKey, Hasher, Params {
             uint24(STATE_TREE_ARITY) ** _treeDepths.intStateTreeDepth
         );
 
-        // // use the poll factory to deploy a new Poll contract
-        // Poll p = pollFactory.deploy(
-        //     _messageProcessorAddress,
-        //     _duration,
-        //     _maxValues,
-        //     _treeDepths,
-        //     batchSizes,
-        //     _coordinatorPubKey,
-        //     vkRegistry,
-        //     this,
-        //     topupCredit,
-        //     owner
-        // );
+        // deploy the new poll contract
+        address poll = pollFactory.createNewInstance(
+            owner,
+            address(accQueueFactoryContract),
+            _messageProcessorAddress,
+            _duration,
+            _maxValues,
+            _treeDepths,
+            batchSizes,
+            _coordinatorPubKey,
+            address(this),
+            topupCredit
+        );
 
-        // polls[pollId] = p;
+        polls[pollId] = IPoll(poll);
 
-        // emit PollDeployed(pollId, address(p), _coordinatorPubKey);
+        emit PollDeployed(pollId, address(poll), _coordinatorPubKey);
     }
 
     /**
@@ -270,7 +253,7 @@ contract MACI is Owned, IPubKey, Hasher, Params {
      * @param _pollId The ID of the poll
      * @return Poll The poll
      */
-    function getPoll(uint256 _pollId) external view returns (Poll) {
+    function getPoll(uint256 _pollId) external view returns (IPoll) {
         if (_pollId >= nextPollId) revert PollDoesNotExist();
         return polls[_pollId];
     }

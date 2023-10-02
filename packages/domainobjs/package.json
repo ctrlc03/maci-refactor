@@ -1,0 +1,7 @@
+{
+    "name": "maci-domainobjects",
+    "version": "0.0.1",
+    "dependencies": {
+        "maci-crypto": "0.0.1"
+    }
+}

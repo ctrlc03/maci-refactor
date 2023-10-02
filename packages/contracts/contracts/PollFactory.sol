@@ -1,95 +1,88 @@
-// // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.19;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
 
-// import { PollDeploymentParams } from "./Utils.sol";
-// import { AccQueueQuinaryMaci } from "./trees/AccQueue.sol";
-// import { Poll } from "./Poll.sol";
-// import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { IPoll } from "./interfaces/IPoll.sol";
+import { IPubKey } from "./DomainObjs.sol";
+import { Params } from "./Params.sol";
+import { IVkRegistry } from "./interfaces/IVkRegistry.sol";
+import { IMaci } from "./interfaces/IMaci.sol";
+import { ITopupCredit } from "./interfaces/ITopupCredit.sol";
+import { IAccQueueFactory } from "./interfaces/IAccQueueFactory.sol";
+import { IAccQueue } from "./interfaces/IAccQueue.sol";
 
-// /**
-//  * @title PollFactory
-//  * A factory contract which deploys Poll contracts.
-//  */
-// // contract PollFactory is Params, IPubKey, Ownable, PollDeploymentParams {
-// //     /** 
-// //      * @dev Deploy a new Poll contract and AccQueue contract for messages.
-// //      * @param _messageProcessorAddress The address of the MessageProcessor
-// //      * contract.
-// //      * @param _duration The duration of the poll, in seconds.
-// //      * @param _maxValues The maximum number of messages and vote options.
-// //      * @param _treeDepths The depths of the message and vote option Merkle
-// //      * trees.
-// //      * @param _batchSizes The sizes of the message and vote option batches.
-// //      * @param _coordinatorPubKey The coordinator's public key.
-// //      * @param _vkRegistry The address of the VerifyingKeyRegistry contract.
-// //      * @param _maci The address of the MACI contract.
-// //      * @param _topupCredit The address of the TopupCredit contract.
-// //      * @param _pollOwner The address of the owner of the Poll contract.
-// //      */
-// //     function deploy(
-// //         address _messageProcessorAddress,
-// //         uint256 _duration,
-// //         MaxValues memory _maxValues,
-// //         TreeDepths memory _treeDepths,
-// //         BatchSizes memory _batchSizes,
-// //         PubKey memory _coordinatorPubKey,
-// //         VkRegistry _vkRegistry,
-// //         IMACI _maci,
-// //         TopupCredit _topupCredit,
-// //         address _pollOwner
-// //     ) public onlyOwner returns (Poll) {
-// //         uint256 treeArity = 5;
+/**
+ * @title PollFactory
+ * @author PSE
+ * @notice A contract that can be used to deploy new instances a Poll contract
+ */
+contract PollFactory is IPubKey, Params {
+    address immutable pollTemplate;
 
-// //         // Deploy the message accQueue
-// //         AccQueue messageAq = new AccQueueQuinaryMaci(
-// //             _treeDepths.messageTreeSubDepth
-// //         );
+    event NewPollDeployed(address _poll);
 
-// //         // Deploy the deactivated messages accQueue
-// //         AccQueue deactivatedKeysAq = new AccQueueQuinaryMaci(
-// //             _treeDepths.messageTreeSubDepth
-// //         );
+    constructor(address _pollTemplate) payable {
+        pollTemplate = _pollTemplate;
+    }
 
-// //         ExtContracts memory extContracts;
+    /**
+     * Create a new instance of a Poll
+     * @param owner the address of the owner of the poll
+     * @param _messageProcessorAddress address of the message processor contract 
+     * @param _duration the duration of the poll
+     * @param _maxValues the max values for the poll
+     * @param _treeDepths the tree depths for the poll trees
+     * @param _batchSizes the batch sizes for the poll
+     * @param _coordinatorPubKey the coordinator's public key
+     * @param _maci the address of the maci instance
+     * @param _topupCredit the address of the topup credit contract
+     */
+    function createNewInstance(
+        address owner,
+        address accQueueFactory,
+        address _messageProcessorAddress,
+        uint256 _duration,
+        MaxValues memory _maxValues,
+        TreeDepths memory _treeDepths,
+        BatchSizes memory _batchSizes,
+        PubKey memory _coordinatorPubKey,
+        address _maci,
+        address _topupCredit
+    ) external returns (address clone) {
+        // Deploy
+        clone = Clones.clone(pollTemplate);
 
-// //         // @todo remove _vkRegistry; only PollProcessorAndTallyer needs it
-// //         extContracts.vkRegistry = _vkRegistry;
-// //         extContracts.maci = _maci;
-// //         extContracts.messageAq = messageAq;
-// //         extContracts.deactivatedKeysAq = deactivatedKeysAq;
-// //         extContracts.topupCredit = _topupCredit;
+        // Deploy a new AccQueue contract for messages.
+        address messageAq = IAccQueueFactory(accQueueFactory).createNewInstanceQuinaryMaci(
+            clone,
+            _treeDepths.messageTreeSubDepth
+        );
+        
+        // Deploy a new AccQueue contract for deactivated keys.
+        address deactivatedKeysAq = IAccQueueFactory(accQueueFactory).createNewInstanceQuinaryMaci(
+            _messageProcessorAddress,
+            _treeDepths.messageTreeSubDepth
+        );
+        
+        // Initialize
+        IPoll(clone).initialize(
+            owner,
+            _messageProcessorAddress,
+            _duration,
+            _maxValues,
+            _treeDepths,
+            _batchSizes,
+            _coordinatorPubKey,
+            ExtContracts({
+                vkRegistry: IVkRegistry(address(0)),
+                maci: IMaci(_maci),
+                topupCredit: ITopupCredit(_topupCredit),
+                messageAq: IAccQueue(messageAq),
+                deactivatedKeysAq: IAccQueue(deactivatedKeysAq)
+            })
+        );
 
-// //         Poll poll = new Poll(
-// //             _messageProcessorAddress,
-// //             _duration,
-// //             _maxValues,
-// //             _treeDepths,
-// //             _batchSizes,
-// //             _coordinatorPubKey,
-// //             extContracts
-// //         );
+        emit NewPollDeployed(clone);
+    }
 
-// //         // Make the Poll contract own the messageAq contract, so only it can
-// //         // run enqueue/merge
-// //         messageAq.transferOwnership(address(poll));
-
-// //         // Make the MessageProcessor contract own the deactivatedKeysAq contract, so only it can
-// //         // run enqueue/merge
-// //         // @todo check for stack too deep 
-// //         {
-// //             deactivatedKeysAq.transferOwnership(_messageProcessorAddress);
-// //         }
-
-// //         // init messageAq
-// //         poll.init();
-
-// //         // @todo should this be _maci.owner() instead?
-// //         poll.transferOwnership(_pollOwner);
-
-// //         return poll;
-// //     }
-// // }
-
-contract PollFactory {
-    
 }

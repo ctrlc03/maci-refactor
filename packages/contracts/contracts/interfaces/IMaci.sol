@@ -4,9 +4,9 @@ import { VkRegistry } from "../VkRegistry.sol";
 import { AccQueue } from "../trees/AccQueue.sol";
 
 /**
- * @title IMACI
+ * @title IMaci
  * @author PSE
- * @notice IMACI is the MACI's contract interface
+ * @notice IMaci is the MACI's contract interface
  */
 interface IMaci {
     function stateTreeDepth() external view returns (uint8);
