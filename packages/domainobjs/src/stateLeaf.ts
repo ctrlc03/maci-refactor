@@ -54,28 +54,28 @@ export class StateLeaf implements IStateLeaf {
    }
 
    public static genRandomLeaf() {
-       const keypair = new Keypair();
-       return new StateLeaf(keypair.pubKey, genRandomSalt(), BigInt(0));
+       const keypair = new Keypair()
+       return new StateLeaf(keypair.pubKey, genRandomSalt(), BigInt(0))
    }
 
    private asArray = (): bigint[] => {
-       return [...this.pubKey.asArray(), this.voiceCreditBalance, this.timestamp];
-   };
+       return [...this.pubKey.asArray(), this.voiceCreditBalance, this.timestamp]
+   }
 
    public asCircuitInputs = (): bigint[] => {
-       return this.asArray();
-   };
+       return this.asArray()
+   }
 
    public hash = (): bigint => {
-       return hash4(this.asArray());
-   };
+       return hash4(this.asArray())
+   }
 
    public asContractParam() {
        return {
            pubKey: this.pubKey.asContractParam(),
            voiceCreditBalance: this.voiceCreditBalance.toString(),
            timestamp: this.timestamp.toString(),
-       };
+       }
    }
 
    public equals(s: StateLeaf): boolean {

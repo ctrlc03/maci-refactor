@@ -16,6 +16,9 @@ export class Command {
 	constructor(cmdType: bigint) {
         this.cmdType = cmdType
     }
+
+	public copy() {}
+	public equals(command: Command) {}
 }
 
 /**
@@ -245,7 +248,7 @@ export class PCommand extends Command {
 	};
 }
 
-/*
+/**
  * Unencrypted data whose fields include the user's public key, vote etc.
  */
 export class KCommand extends Command {
@@ -289,8 +292,8 @@ export class KCommand extends Command {
 			[BigInt(this.c2r[0].toString()), BigInt(this.c2r[1].toString())],
 			BigInt(this.pollId.toString()),
 			BigInt(this.newStateIndex.toString()),
-		);
-	};
+		)
+	}
 
 	public asArray = (): bigint[] => {		
 		const a = [
@@ -300,12 +303,12 @@ export class KCommand extends Command {
 			...this.c1r,
 			...this.c2r,
 			this.pollId,
-		];
-		assert(a.length === 9);
-		return a;
-	};
+		]
+		assert(a.length === 9)
+		return a
+	}
 
-	public asCircuitInputs = (): BigInt[] => {
+	public asCircuitInputs = (): bigint[] => {
 		return this.asArray();
 	};
 
@@ -331,31 +334,30 @@ export class KCommand extends Command {
 	public encrypt = (
 		sharedKey: EcdhSharedKey
 	): Message => {
-
 		const plaintext = [
 			...this.asArray()
-		];
+		]
 
-		assert(plaintext.length === 9);
+		assert(plaintext.length === 9)
 
-		const ciphertext: Ciphertext = encrypt(plaintext, sharedKey, BigInt(0));
+		const ciphertext: Ciphertext = encrypt(plaintext, sharedKey, BigInt(0))
 
-		const message = new Message(BigInt(3), ciphertext);
+		const message = new Message(BigInt(3), ciphertext)
 
-		return message;
-	};
+		return message
+	}
 
 	/**
 	 * Decrypts a Message to produce a Command.
 	 */
 	public static decrypt = (message: Message, sharedKey: EcdhSharedKey) => {
-		const decrypted = decrypt(message.data, sharedKey, BigInt(0), 9);
-		const newPubKey = new PublicKey([decrypted[0], decrypted[1]]);
-		const newCreditBalance = decrypted[2];
-		const nullifier = decrypted[3];
-		const c1r = [decrypted[4], decrypted[5]];
-		const c2r = [decrypted[6], decrypted[7]];
-		const pollId = decrypted[8];
+		const decrypted = decrypt(message.data, sharedKey, BigInt(0), 9)
+		const newPubKey = new PublicKey([decrypted[0], decrypted[1]])
+		const newCreditBalance = decrypted[2]
+		const nullifier = decrypted[3]
+		const c1r = [decrypted[4], decrypted[5]]
+		const c2r = [decrypted[6], decrypted[7]]
+		const pollId = decrypted[8]
 
 		const command = new KCommand(
 			newPubKey,
@@ -364,33 +366,33 @@ export class KCommand extends Command {
 			c1r,
 			c2r,
 			pollId,
-		);
+		)
 
-		return { command };
-	};
+		return { command }
+	}
 
 	public prepareValues(
 		deactivatedPrivateKey: PrivateKey,
 		stateLeaves: StateLeaf[],
 		stateTree: any,
-        numSignUps: BigInt,
-        stateIndex: BigInt,
-        salt: BigInt,
+        numSignUps: bigint,
+        stateIndex: bigint,
+        salt: bigint,
 		coordinatorPubKey: PublicKey,
         deactivatedKeysTree: any,
-		deactivatedKeyIndex: BigInt,
-		z: BigInt,
-		c1: BigInt[],
-		c2: BigInt[],
+		deactivatedKeyIndex: bigint,
+		z: bigint,
+		c1: bigint[],
+		c2: bigint[],
 	) {
-		const stateTreeRoot = stateTree.root;
-		const deactivatedKeysRoot = deactivatedKeysTree.root;
+		const stateTreeRoot = stateTree.root
+		const deactivatedKeysRoot = deactivatedKeysTree.root
 		
-		const stateLeaf = stateLeaves[parseInt(stateIndex.toString())];
-		const { voiceCreditBalance: oldCreditBalance, timestamp } = stateLeaf;
+		const stateLeaf = stateLeaves[parseInt(stateIndex.toString())]
+		const { voiceCreditBalance: oldCreditBalance, timestamp } = stateLeaf
 
-		const stateTreeInclusionProof = stateTree.genMerklePath(Number(stateIndex)).pathElements;
-		const deactivatedKeysInclusionProof = deactivatedKeysTree.genMerklePath(parseInt(deactivatedKeyIndex.toString())).pathElements;
+		const stateTreeInclusionProof = stateTree.genMerklePath(Number(stateIndex)).pathElements
+		const deactivatedKeysInclusionProof = deactivatedKeysTree.genMerklePath(parseInt(deactivatedKeyIndex.toString())).pathElements
 
 		const ecdhKeypair = new Keypair()
 		const sharedKey = Keypair.genEcdhSharedKey(
@@ -398,8 +400,8 @@ export class KCommand extends Command {
 			coordinatorPubKey,
 		)
 
-		const encryptedMessage = this.encrypt(sharedKey);
-		const messageHash = sha256Hash(encryptedMessage.asContractParam().data.map((x:string) => BigInt(x)));
+		const encryptedMessage = this.encrypt(sharedKey)
+		const messageHash = sha256Hash(encryptedMessage.asContractParam().data.map((x:string) => BigInt(x)))
 
 		const circuitInputs = stringifyBigInts({
 			oldPrivKey: deactivatedPrivateKey.asCircuitInputs(),         
@@ -433,6 +435,6 @@ export class KCommand extends Command {
 			]),
 		})
 
-		return { circuitInputs, encPubKey: ecdhKeypair.pubKey, message: encryptedMessage };
+		return { circuitInputs, encPubKey: ecdhKeypair.pubKey, message: encryptedMessage }
 	}
 }

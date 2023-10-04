@@ -76,7 +76,6 @@ export class DeactivatedKeyLeaf implements IDeactivatedKeyLeaf {
     }
 
     public asCircuitInputs = (): bigint[] => {
-
         return this.asArray()
     }
 

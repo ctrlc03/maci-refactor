@@ -23,19 +23,19 @@ export class Ballot {
    }
 
    public hash = (): BigInt => {
-       const vals = this.asArray();
-       return hashLeftRight(vals[0], vals[1]);
-   };
+       const vals = this.asArray()
+       return hashLeftRight(vals[0], vals[1])
+   }
 
    public asCircuitInputs = (): BigInt[] => {
-       return this.asArray();
-   };
+       return this.asArray()
+   }
 
    public asArray = (): bigint[] => {
-       let lastIndexToInsert = this.votes.length - 1;
+       let lastIndexToInsert = this.votes.length - 1
        while (lastIndexToInsert > 0) {
            if (this.votes[lastIndexToInsert] !== BigInt(0)) {
-               break;
+               break
            }
            lastIndexToInsert--;
        }
@@ -44,38 +44,37 @@ export class Ballot {
            BigInt(0),
            5,
            hash5
-       );
+       )
        for (let i = 0; i <= lastIndexToInsert; i++) {
-           voTree.insert(this.votes[i]);
+           voTree.insert(this.votes[i])
        }
 
-       return [this.nonce, voTree.root];
-   };
+       return [this.nonce, voTree.root]
+   }
 
    public copy = (): Ballot => {
-       const b = new Ballot(this.votes.length, this.voteOptionTreeDepth);
+       const b = new Ballot(this.votes.length, this.voteOptionTreeDepth)
 
-       b.votes = this.votes.map((x) => BigInt(x.toString()));
-       b.nonce = BigInt(this.nonce.toString());
-
-       return b;
-   };
+       b.votes = this.votes.map((x) => BigInt(x.toString()))
+       b.nonce = BigInt(this.nonce.toString())
+       return b
+   }
 
    public equals(b: Ballot): boolean {
        for (let i = 0; i < this.votes.length; i++) {
            if (b.votes[i] !== this.votes[i]) {
-               return false;
+               return false
            }
        }
-       return b.nonce === this.nonce && this.votes.length === b.votes.length;
+       return b.nonce === this.nonce && this.votes.length === b.votes.length
    }
 
    public static genRandomBallot(
        _numVoteOptions: number,
        _voteOptionTreeDepth: number
    ) {
-       const ballot = new Ballot(_numVoteOptions, _voteOptionTreeDepth);
-       ballot.nonce = genRandomSalt();
+       const ballot = new Ballot(_numVoteOptions, _voteOptionTreeDepth)
+       ballot.nonce = genRandomSalt()
        return ballot;
    }
 
@@ -83,7 +82,7 @@ export class Ballot {
        _numVoteOptions: number,
        _voteOptionTreeDepth: number
    ) {
-       const ballot = new Ballot(_numVoteOptions, _voteOptionTreeDepth);
-       return ballot;
+       const ballot = new Ballot(_numVoteOptions, _voteOptionTreeDepth)
+       return ballot
    }
 }

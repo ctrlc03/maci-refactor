@@ -86,6 +86,7 @@ export class G2Point {
 
 /**
  * Hash an array of uint256 values the same way that the EVM does.
+ * @param input - the array of values to hash 
  */
 export const sha256Hash = (input: bigint[]) => {
     const types: string[] = []
@@ -104,35 +105,54 @@ export const sha256Hash = (input: bigint[]) => {
  * Hash two BigInts with the Poseidon hash function
  * @param left The left-hand element to hash
  * @param right The right-hand element to hash
+ * @return The hash of the two elements
  */
 export const hashLeftRight = (left: bigint, right: bigint): bigint => {
     return poseidonT3([left, right])
 }
 
-// Hash up to 2 elements
+/**
+ * Hash up to 2 elements
+ * @param inputs The elements to hash
+ */ 
 export const poseidonT3 = (inputs: bigint[]) => {
     assert(inputs.length === 2)
     return poseidon(inputs)
 }
 
-// Hash up to 3 elements
+/**
+ * Hash up to 3 elements
+ * @param inputs The elements to hash
+ */ 
 export const poseidonT4 = (inputs: bigint[]) => {
     assert(inputs.length === 3)
     return poseidon(inputs)
 }
 
-// Hash up to 4 elements
+/**
+ * Hash up to 4 elements
+ * @param inputs The elements to hash
+ */ 
 export const poseidonT5 = (inputs: bigint[]) => {
     assert(inputs.length === 4)
     return poseidon(inputs)
 }
 
-// Hash up to 5 elements
+/**
+ * Hash up to 5 elements
+ * @param inputs The elements to hash
+ */ 
 export const poseidonT6 = (inputs: bigint[]) => {
     assert(inputs.length === 5)
     return poseidon(inputs)
 }
 
+/**
+ * Hash up to N elements
+ * @param numElements The number of elements to hash
+ * @param elements The elements to hash
+ * @returns The hash of the elements
+ */ 
 export const hashN = (numElements: number, elements: Plaintext): bigint => {
     const elementLength = elements.length
     if (elements.length > numElements) {
@@ -159,11 +179,14 @@ export const hash2 = (elements: Plaintext): bigint => hashN(2, elements)
 export const hash3 = (elements: Plaintext): bigint => hashN(3, elements)
 export const hash4 = (elements: Plaintext): bigint => hashN(4, elements)
 export const hash5 = (elements: Plaintext): bigint => hashN(5, elements)
+// @todo look to make this work 
 export const hash9 = (elements: Plaintext): bigint => hashN(9, elements)
 
 /**
  * A convenience function to use Poseidon to hash a Plaintext with
  * no more than 13 elements
+ * @param elements The elements to hash
+ * @returns The hash of the elements
  */
 export const hash13 = (elements: Plaintext): bigint => {
     const max = 13
@@ -188,6 +211,8 @@ export const hash13 = (elements: Plaintext): bigint => {
 
 /**
  * Hash a single BigInt with the Poseidon hash function
+ * @param preImage The element to hash
+ * @return The hash of the element
  */
 export const hashOne = (preImage: bigint): bigint => poseidonT3([preImage, BigInt(0)])
 
@@ -207,22 +232,20 @@ export const genRandomBabyJubValue = (): bigint => {
     //const min = (lim - SNARK_FIELD_SIZE) % SNARK_FIELD_SIZE
     const min = BigInt('6350874878119819312338956282401532410528162663560392320966563075034087161851')
 
-    let rand: bigint = BigInt(0)
-    while (true) {
-        rand = BigInt('0x' + randomBytes(32).toString('hex'))
+    let privKey: PrivKey = SNARK_FIELD_SIZE
 
+    do {
+        let rand: bigint = BigInt('0x' + randomBytes(32).toString('hex'))
         if (rand >= min) {
-            break
+            privKey = rand % SNARK_FIELD_SIZE
         }
-    }
-
-    const privKey: PrivKey = rand % SNARK_FIELD_SIZE
-    assert(privKey < SNARK_FIELD_SIZE)
+    } while (privKey >= SNARK_FIELD_SIZE || privKey === undefined)
 
     return privKey
 }
 
 /**
+ * Generate a private key 
  * @return A BabyJub-compatible private key.
  */
 export const genPrivKey = (): bigint => {
@@ -230,6 +253,7 @@ export const genPrivKey = (): bigint => {
 }
 
 /**
+ * Generate a random value 
  * @return A BabyJub-compatible salt.
  */
 export const genRandomSalt = (): bigint => {
@@ -240,6 +264,8 @@ export const genRandomSalt = (): bigint => {
  * An internal function which formats a random private key to be compatible
  * with the BabyJub curve. This is the format which should be passed into the
  * PubKey and other circuits.
+ * @param privKey A private key generated using genPrivKey()
+ * @return A BabyJub-compatible private key.
  */
 export const formatPrivKeyForBabyJub = (privKey: PrivKey) => {
     const sBuff = eddsa.pruneBuffer(
@@ -308,6 +334,9 @@ export const genEcdhSharedKey = (
 
 /**
  * Encrypts a plaintext using a given key.
+ * @param plaintext The plaintext to encrypt.
+ * @param sharedKey The shared key to use for encryption.
+ * @param nonce The nonce to use for encryption.
  * @return The ciphertext.
  */
 export const encrypt = (
@@ -325,6 +354,10 @@ export const encrypt = (
 
 /**
  * Decrypts a ciphertext using a given key.
+ * @param ciphertext The ciphertext to decrypt.
+ * @param sharedKey The shared key to use for decryption.
+ * @param nonce The nonce to use for decryption.
+ * @param length The length of the plaintext.
  * @return The plaintext.
  */
 export const decrypt = (
@@ -333,7 +366,6 @@ export const decrypt = (
     nonce: BigInt,
     length: number,
 ): Plaintext => {
-
     const plaintext = poseidonDecrypt(
         ciphertext,
         sharedKey,
@@ -409,7 +441,7 @@ export const elGamalDecrypt = (
     const s = babyJub.mulPointEscalar(c1, formatPrivKeyForBabyJub(privKey))
     const sInv = [SNARK_FIELD_SIZE - s[0], s[1]]
     const m = babyJub.addPoint(c2, sInv)
-    return m;
+    return m
 }
 
 /**
@@ -425,7 +457,7 @@ const bitToCurve = (
         case BigInt(1):
             return babyJub.Base8
         default: 
-            throw new Error('Invalid bit value');
+            throw new Error('Invalid bit value')
     }
 }
 
@@ -491,14 +523,14 @@ export const elGamalRerandomize = (
     const c1r = babyJub.addPoint(
         babyJub.mulPointEscalar(babyJub.Base8, z),
         c1
-    );
+    )
 
     const c2r = babyJub.addPoint(
         babyJub.mulPointEscalar(pubKey, z),
         c2
-    );
+    )
     
-    return [c1r, c2r];
+    return [c1r, c2r]
 }
 
 
