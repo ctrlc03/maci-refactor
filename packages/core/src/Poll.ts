@@ -10,7 +10,9 @@ import {
     PrivateKey, 
     PublicKey, 
     StateLeaf, 
-    TCommand 
+    TCommand,
+    blankStateLeaf, 
+    blankStateLeafHash
 } from "../../domainobjs/src"
 import { 
     BatchSizes, 
@@ -46,10 +48,6 @@ import {
 import { 
     smt
 } from "circomlib"
-import { 
-    blankStateLeaf, 
-    blankStateLeafHash 
-} from "./constants"
 import { 
     MaciState
 } from "./Maci"
@@ -1016,5 +1014,13 @@ export class Poll {
             this.cbi * this.batchSizes.subsidyBatchSize < this.ballots.length
         )
         
+    }
+
+    public equals = (p: Poll): boolean => {
+        return true 
+    }
+
+    public copy = (): Poll => {
+        return this 
     }
 }

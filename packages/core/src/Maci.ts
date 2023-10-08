@@ -1,9 +1,8 @@
 import { AccQueue, hash5, IncrementalQuinTree } from "../../crypto/src"
-import { Keypair, PublicKey, StateLeaf } from "../../domainobjs/src"
+import { Keypair, PublicKey, StateLeaf, blankStateLeaf, blankStateLeafHash } from "../../domainobjs/src"
 import { MaxValues, TreeDepths } from "../types"
-import { blankStateLeaf, blankStateLeafHash, STATE_TREE_DEPTH } from "./constants"
+import { STATE_TREE_DEPTH } from "./constants"
 import { Poll } from "./Poll"
-import assert from "node:assert"
 
 /**
  * @title MaciState
@@ -12,33 +11,57 @@ import assert from "node:assert"
  * @author PSE 
  */
 export class MaciState {
-    public STATE_TREE_ARITY = 5
-    public STATE_TREE_SUBDEPTH = 2
-    public MESSAGE_TREE_ARITY = 5
-    public VOTE_OPTION_TREE_ARITY = 5
+    // trees config values
+    public stateTreeArity: number 
+    public stateTreeSubdepth: number 
+    public messageTreeArity: number 
+    public voteOptionTreeArity: number 
+    public stateTreeDepth: number 
 
-    public stateTreeDepth = STATE_TREE_DEPTH
-
+    // an array of all polls generated
     public polls: Poll[] = []
+    // an array of all state leaves (signups)
     public stateLeaves: StateLeaf[] = []
-    public stateTree = new IncrementalQuinTree(
-        this.stateTreeDepth, 
-        blankStateLeafHash, 
-        this.STATE_TREE_ARITY,
-        hash5
-    )
+    public stateTree: IncrementalQuinTree 
+    public stateAq: AccQueue
 
-    public stateAq = new AccQueue(
-        this.STATE_TREE_SUBDEPTH,
-        this.STATE_TREE_ARITY,
-        blankStateLeafHash
-    )
+    public pollBeingProcessed: boolean = false 
+    public currentPollBeingProcessed: number 
+    public numSignUps: number = 0 
 
-    public pollBeingProcessed: boolean 
-    public currentPollBeingProcessed: number
-    public numSignUps: number 
+    /**
+     * Create a new instance of the MaciState class
+     * @param _stateTreeArity 
+     * @param _messageTreeArity 
+     * @param _voteOptionTreeArity 
+     * @param _stateTreeDepth 
+     * @param _stateTreeSubDepth 
+     */
+    constructor(
+        _stateTreeArity: number = 5,
+        _messageTreeArity: number = 5,
+        _voteOptionTreeArity: number = 5,
+        _stateTreeDepth: number = STATE_TREE_DEPTH,
+        _stateTreeSubDepth: number = 2
+    ) {
+        this.stateTreeArity = _stateTreeArity
+        this.messageTreeArity = _messageTreeArity
+        this.voteOptionTreeArity = _voteOptionTreeArity
+        this.stateTreeDepth = _stateTreeDepth
+        this.stateTreeSubdepth = _stateTreeSubDepth
 
-    constructor() {
+        this.stateTree = new IncrementalQuinTree(
+            this.stateTreeDepth, 
+            blankStateLeafHash, 
+            this.stateTreeArity,
+            hash5
+        )
+        this.stateAq = new AccQueue(
+            this.stateTreeSubdepth,
+            this.stateTreeArity,
+            blankStateLeafHash
+        )
+
         this.stateLeaves.push(blankStateLeaf)
         this.stateTree.insert(blankStateLeafHash)
         this.stateAq.enqueue(blankStateLeafHash)
@@ -104,8 +127,8 @@ export class MaciState {
             _treeDepths,
             {
                 messageBatchSize: _messageBatchSize,
-                subsidyBatchSize: this.STATE_TREE_ARITY ** _treeDepths.intStateTreeDepth,
-                tallyBatchSize: this.STATE_TREE_ARITY ** _treeDepths.intStateTreeDepth,
+                subsidyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
+                tallyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
             },
             _maxValues,
             this
@@ -146,9 +169,9 @@ export class MaciState {
      */
     public equals = (m: MaciState): boolean => {
         const result =
-            this.STATE_TREE_ARITY === m.STATE_TREE_ARITY &&
-            this.MESSAGE_TREE_ARITY === m.MESSAGE_TREE_ARITY &&
-            this.VOTE_OPTION_TREE_ARITY === m.VOTE_OPTION_TREE_ARITY &&
+            this.stateTreeArity === m.stateTreeArity &&
+            this.messageTreeArity === m.messageTreeArity &&
+            this.voteOptionTreeArity === m.voteOptionTreeArity &&
             this.stateTreeDepth === m.stateTreeDepth &&
             this.polls.length === m.polls.length &&
             this.stateLeaves.length === m.stateLeaves.length
@@ -167,110 +190,5 @@ export class MaciState {
         }
 
         return true
-    }
-
-    /**
-     * Pack the subsidy small values
-     * @param row 
-     * @param col 
-     * @param numSignUps 
-     * @returns The packed values
-     */
-    public static packSubsidySmallVals = (
-        row: number,
-        col: number,
-        numSignUps: number,
-    ): bigint => {
-        // Note: the << operator has lower precedence than +
-        const packedVals =
-            (BigInt(numSignUps) << BigInt(100)) +
-            (BigInt(row) << BigInt(50)) +
-            BigInt(col)
-        return packedVals
-    }
-
-    /**
-     * Pack the Tally Votes values
-     * @param batchStartIndex 
-     * @param batchSize 
-     * @param numSignUps 
-     * @returns The packed values
-     */
-    public static packTallyVotesSmallVals = (
-        batchStartIndex: number,
-        batchSize: number,
-        numSignUps: number,
-    ): bigint => {
-        // Note: the << operator has lower precedence than +
-        const packedVals =
-            (BigInt(batchStartIndex) / BigInt(batchSize)) +
-            (BigInt(numSignUps) << BigInt(50))
-
-        return packedVals
-    }
-
-    /**
-     * Unpack the previously packed tally values
-     * @param packedVals The packed values
-     * @returns The unpacked values
-     */
-    public static unpackTallyVotesSmallVals = (
-        packedVals: bigint,
-    ): any => {
-        let asBin = packedVals.toString(2)
-        assert(asBin.length <= 100)
-        while (asBin.length < 100) {
-            asBin = '0' + asBin
-        }
-        const numSignUps = BigInt('0b' + asBin.slice(0, 50))
-        const batchStartIndex = BigInt('0b' + asBin.slice(50, 100))
-
-        return { numSignUps, batchStartIndex }
-    }
-    
-    /**
-     * Pack process messages values
-     * @param maxVoteOptions 
-     * @param numUsers 
-     * @param batchStartIndex 
-     * @param batchEndIndex 
-     * @returns 
-     */
-    public static packProcessMessageSmallVals = (
-        maxVoteOptions: bigint,
-        numUsers: bigint,
-        batchStartIndex: number,
-        batchEndIndex: number,
-    ): bigint => {
-        return BigInt(`${maxVoteOptions}`) +
-            (BigInt(`${numUsers}`) << BigInt(50)) +
-            (BigInt(batchStartIndex) << BigInt(100)) +
-            (BigInt(batchEndIndex) << BigInt(150))
-    }
-
-    /**
-     * Unpack previously packed process message values
-     * @param packedVals The packed values
-     * @returns The unpacked values
-     */
-    public static unpackProcessMessageSmallVals = (
-        packedVals: bigint,
-    ) => {
-        let asBin = (packedVals).toString(2)
-        assert(asBin.length <= 200)
-        while (asBin.length < 200) {
-            asBin = '0' + asBin
-        }
-        const maxVoteOptions = BigInt('0b' + asBin.slice(150, 200))
-        const numUsers = BigInt('0b' + asBin.slice(100, 150))
-        const batchStartIndex = BigInt('0b' + asBin.slice(50, 100))
-        const batchEndIndex = BigInt('0b' + asBin.slice(0, 50))
-
-        return {
-            maxVoteOptions,
-            numUsers,
-            batchStartIndex,
-            batchEndIndex,
-        }
-    }
+    }   
 }

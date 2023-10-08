@@ -24,7 +24,9 @@ export {
 
 export {
 	SERIALIZED_PRIV_KEY_PREFIX,
-	SERIALIZED_PUB_KEY_PREFIX
+	SERIALIZED_PUB_KEY_PREFIX,
+	blankStateLeaf,
+	blankStateLeafHash
 } from "./constants"
 
 export {
