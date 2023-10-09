@@ -103,7 +103,6 @@ export class MaciState {
     // @todo do we really need both duration and end timestamp?
     /**
      * Deploy a new poll
-     * @param _duration How long the poll should last
      * @param _pollEndTimestamp When the poll should end
      * @param _maxValues The Max values for the circuit params
      * @param _treeDepths The depths of the merkle trees
@@ -112,8 +111,7 @@ export class MaciState {
      * @retruns the id of the new poll 
      */
     public deployPoll = (
-        _duration: number,
-        _pollEndTimestamp: bigint,
+        _pollEndTimestamp: number,
         _maxValues: MaxValues,
         _treeDepths: TreeDepths,
         _messageBatchSize: number,
@@ -121,7 +119,6 @@ export class MaciState {
     ): number => {
         // create the new poll object
         const poll: Poll = new Poll(
-            _duration,
             _pollEndTimestamp,
             _coordinatorKeypair,
             _treeDepths,
@@ -131,7 +128,8 @@ export class MaciState {
                 tallyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
             },
             _maxValues,
-            this
+            this,
+            this.polls.length
         )
 
         // save it 

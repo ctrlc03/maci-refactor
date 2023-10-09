@@ -17,7 +17,7 @@ export class Command {
         this.cmdType = cmdType
     }
 
-	public copy() {}
+	public copy(): Command { return this }
 	public equals(command: Command) {}
 }
 

@@ -82,7 +82,7 @@ describe("MaciState", () => {
 
     test("deployPoll should create a new poll instance", () => {
         const maciState = new MaciState()
-        const pollId = maciState.deployPoll(100, BigInt(1000), maxValues, treeDepths, 10, coordinatorKeyPair)
+        const pollId = maciState.deployPoll(100, maxValues, treeDepths, 10, coordinatorKeyPair)
         expect(maciState.polls.length).toEqual(1)
         expect(maciState.polls[0]).toBeDefined()
         expect(pollId).toEqual(maciState.polls.length - 1)
@@ -105,6 +105,29 @@ describe("MaciState", () => {
         )
 
         expect(stateIndex).toEqual(1)
+
+        maciState.stateAq.mergeSubRoots(0)
+        maciState.stateAq.merge(STATE_TREE_DEPTH)
+        expect(maciState.stateAq.getRoot(STATE_TREE_DEPTH)).toEqual(stateTree.root)
+    })
+
+    test.skip("the state root should be correct after 2 signups", () => {
+        const timestamp = BigInt(Date.now().valueOf())
+        const stateLeaf = new StateLeaf(
+            userPubKey,
+            voiceCreditBalance,
+            timestamp 
+        )
+
+        stateTree.insert(stateLeaf.hash())
+
+        const stateIndex = maciState.signUp(
+            userPubKey,
+            voiceCreditBalance,
+            timestamp
+        )
+
+        expect(stateIndex).toEqual(25)
 
         maciState.stateAq.mergeSubRoots(0)
         maciState.stateAq.merge(STATE_TREE_DEPTH)

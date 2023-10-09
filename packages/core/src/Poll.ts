@@ -32,6 +32,7 @@ import {
     hash3, 
     hash4, 
     hash5, 
+    hashLeftRight, 
     sha256Hash, 
     stringifyBigInts, 
     verifySignature
@@ -39,7 +40,8 @@ import {
 import { 
     DEACT_KEYS_TREE_DEPTH, 
     DEACT_MESSAGE_INIT_HASH, 
-    STATE_TREE_DEPTH 
+    STATE_TREE_DEPTH, 
+    packProcessMessageSmallVals
 } from "."
 import { 
     Ciphertext,
@@ -58,8 +60,6 @@ import {
  * @author PSE 
  */
 export class Poll {
-    // @notice the duration of the poll
-    public duration: number 
     // @notice store the keypair of the coordinator (we only use the public key on chain)
     public coordinatorKeyPair: Keypair
     // @notice the depths of the trees
@@ -142,17 +142,26 @@ export class Poll {
     // so we can use it to search for deactivatedKeyIndex
     public deactivatedKeyEvents: DeactivatedKeyEvent[] = [];
 
+    /**
+     * Generate a new Poll instance
+     * @param _pollEndTimestamp - When the Poll ends.
+     * @param _coordinatorKeypair - The key pair of the coordinator
+     * @param _treeDepths - The depths of the merkle trees
+     * @param _batchSizes - The sizes of the message batches
+     * @param _maxValues - The max values for the circuit params
+     * @param _maciStateRef - The MaciState reference
+     * @param _pollId - The id of the poll
+     */
     constructor (
-        _duration: number,
-        _pollEndTimestamp: bigint,
+        _pollEndTimestamp: number,
         _coordinatorKeypair: Keypair,
         _treeDepths: TreeDepths,
         _batchSizes: BatchSizes,
         _maxValues: MaxValues,
         _maciStateRef: MaciState,
+        _pollId: number 
     ) {
-        this.duration = _duration
-        this.pollEndTimestamp = this.pollEndTimestamp
+        this.pollEndTimestamp = _pollEndTimestamp
         this.coordinatorKeyPair = _coordinatorKeypair
         this.treeDepths = _treeDepths
         this.batchSizes = _batchSizes
@@ -185,8 +194,13 @@ export class Poll {
             this.treeDepths.voteOptionTreeDepth
         )
         this.ballots.push(blankBallot)
+
+        this.pollId = _pollId
     }
 
+    /**
+     * Create a new empty nullifier tree
+     */
     public initNullifiersTree = async () => {
         this.nullifiersTree = await smt.newMemEmptyTrie()
         await this.nullifiersTree.insert(0, 0)
@@ -194,6 +208,9 @@ export class Poll {
 
     /**
      * @notice Allows to generate a new Key (msg type == 3)
+     * @param _message 
+     * @param _encPubKey
+     * @param _newStateIndex
      */
     public generateNewKey = (
         _message: Message,
@@ -243,9 +260,9 @@ export class Poll {
 
     /**
      * @notice Save the key event event
-     * @param {bigint} _keyHash - the hash of the key 
-     * @param {bigint[]} _c1 
-     * @param {bigint[]} _c2 
+     * @param _keyHash - the hash of the key 
+     * @param _c1 
+     * @param _c2 
      */
     public processDeactivatedKeyEvent = (
         _keyHash: bigint, 
@@ -357,7 +374,6 @@ export class Poll {
      */
     public topupMessage = (
         _message: Message,
-        _pollId: bigint
     ) => {
         // validation 
         assert (_message.msgType === BigInt(2), "Poll:topupMessage: message type must be 2")
@@ -381,7 +397,7 @@ export class Poll {
         const command = new TCommand(
             _message.data[0], 
             _message.data[1],
-            _pollId
+            BigInt(this.pollId)
         )
 
         this.commands.push(command)
@@ -428,7 +444,7 @@ export class Poll {
             this.commands.push(command)
         } catch (error: any) {
             const keyPair = new Keypair()
-            // @note check that the message type is correct
+            // @note check that the message type is correct (in the original version it was 0)
             const command = new PCommand(BigInt(1), keyPair.pubKey, BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0))
             this.commands.push(command)
         }
@@ -446,6 +462,7 @@ export class Poll {
 
     /**
      * Check whether there are any unprocessed messages
+     * @returns true if there are unprocessed messages, false otherwise
      */
     public hasUnprocessedMessages = (): boolean => {
         const batchSize = this.batchSizes.messageBatchSize
@@ -633,7 +650,6 @@ export class Poll {
      * @param stateIndex 
      * @param newCreditBalance 
      * @param salt 
-     * @param pollId 
      */
     public generateCircuitInputsForGenerateNewKey = (
         newPublicKey: PublicKey,
@@ -643,7 +659,6 @@ export class Poll {
         stateIndex: bigint,
         newCreditBalance: bigint,
         salt: bigint,
-        pollId: bigint
     ) => {
         if (!this.stateCopied) this.copyStateFromMaci()
 
@@ -656,6 +671,7 @@ export class Poll {
 
         const deactivatedKeyEvent = this.deactivatedKeyEvents[deactivatedKeyIndex]
 
+        // @note in the original version it was fixed to 42 
         const z = genRandomSalt()
         // const z = BigInt(42)
 
@@ -680,7 +696,7 @@ export class Poll {
             nullifier,
             c1r, 
             c2r,
-            pollId
+            BigInt(this.pollId)
         )
 
         return kCommand.prepareValues(
@@ -709,12 +725,9 @@ export class Poll {
      * Note that this function will only process as many state leaves as there
      * are ballots to prevent accidental inclusion of a new user after this
      * poll has concluded.
-     * @param _pollId The ID of the poll associated with the messages to
-     *        process
      * @return The inputs for the processMessages circuit
      */
     public processMessages = async (
-        _pollId: number 
     ): Promise<any> => {
         // validation first
         assert(this.hasUnprocessedMessages(), 'Poll:processMessages, No more messages to process')
@@ -731,11 +744,11 @@ export class Poll {
         if (this.numBatchesProcessed === 0) 
             assert(this.currentMessageBatchIndex === undefined)
             // prevent other batches from being processed
-            this.maciStateRef.pollBeingProcess = true
-            this.maciStateRef.currentPollBeingProcessed = _pollId 
+            this.maciStateRef.pollBeingProcessed = true
+            this.maciStateRef.currentPollBeingProcessed = this.pollId  
 
         // @todo look if we can move this up 
-        if (this.maciStateRef.pollBeingProcessed) assert(this.maciStateRef.currentPollBeingProcessed === _pollId)
+        if (this.maciStateRef.pollBeingProcessed) assert(this.maciStateRef.currentPollBeingProcessed === this.pollId)
 
         if (this.numBatchesProcessed === 0) {
             const r = this.messages.length % batchSize 
@@ -939,7 +952,7 @@ export class Poll {
         ])
 
         // if we have processed all batches, then we can release the lock on the maci state obj 
-        if (this.numBatchesProcessed * batchSize >= this.messages.length) this.maciStateRef.pollBeingProcess = false
+        if (this.numBatchesProcessed * batchSize >= this.messages.length) this.maciStateRef.pollBeingProcessed = false
 
         return stringifyBigInts(circuitInputs)
     }
@@ -981,9 +994,195 @@ export class Poll {
         while (commands.length % this.batchSizes.messageBatchSize > 0) 
             commands.push(commands[commands.length - 1])
         commands = commands.slice(_index, _index + this.batchSizes.messageBatchSize)
-        // @todo finish 
+
+        // pad with zero value
+        while (this.messageTree.nextIndex < _index + this.batchSizes.messageBatchSize) 
+            this.messageTree.insert(this.messageTree.zeroValue)
+
+        const messageSubRootPath = this.messageTree.genMerkleSubrootPath(
+            _index,
+            _index + this.batchSizes.messageBatchSize
+        )
+
+        assert(
+            IncrementalQuinTree.verifyMerklePath(
+                messageSubRootPath,
+                this.messageTree.hashFunc
+            ),
+            'Poll:genProcessMessagesCircuitInputsPartial: Invalid message subroot path'
+        )
+
+        const batchEndIndex = _index + this.batchSizes.messageBatchSize > this.messages.length ? 
+            this.messages.length : 
+            _index + this.batchSizes.messageBatchSize
+
+        let encPubKeys = this.encPubKeys.map((x) => x.copy())
+        // @todo why are we pushing the last element?
+        while (encPubKeys.length % this.batchSizes.messageBatchSize > 0) {
+            encPubKeys.push(encPubKeys[encPubKeys.length - 1])
+        }
+        // @todo why in the original we use _index + batchEndIndex but not batchEndIndex??
+        encPubKeys = encPubKeys.slice(_index, batchEndIndex)
+
+        const msgRoot = this.messageAq.getRoot(this.treeDepths.messageTreeDepth)
+
+        const currentSbCommitment = hash4([
+            this.stateTree.root,
+            this.ballotTree.root,
+            this.nullifiersTree.root,
+            this.sbSalts[this.currentMessageBatchIndex]
+        ])
+
+        // @todo in the original version it says:
+        // Generate a SHA256 hash of inputs which the contract provides
+        // but no hash is generated
+        const packedVals = packProcessMessageSmallVals(
+            BigInt(this.maxValues.maxVoteOptions),
+            BigInt(this.numSignUps),
+            _index,
+            batchEndIndex
+        )
+
+        return stringifyBigInts({
+            pollEndTimestamp: this.pollEndTimestamp,
+            packedVals,
+            msgRoot,
+            msgs,
+            msgSubrootPathElements: messageSubRootPath.pathElements,
+            coordPrivKey: this.coordinatorKeyPair.privKey.asCircuitInputs(),
+            coordPubKey: this.coordinatorKeyPair.pubKey.asCircuitInputs(),
+            encPubKeys: encPubKeys.map((x) => x.asCircuitInputs()),
+            currentStateRoot: this.stateTree.root,
+            currentBallotRoot: this.ballotTree.root,
+            currentSbCommitment,
+            currentSbSalt: this.sbSalts[this.currentMessageBatchIndex]
+        })
     }
 
+    /**
+     * Process all messages. This function does not update the ballots or state
+     * leaves; rather, it copies and then updates them. This makes it possible
+     * to test the result of multiple processMessage() invocations.
+     * @return The state leaves and ballots after processing all messages
+     */
+    public processAllMessages = async () => {
+        if (!this.stateCopied) this.copyStateFromMaci()
+
+        const stateLeaves = this.stateLeaves.map((l) => l.copy())
+        const ballots = this.ballots.map((b) => b.copy())
+        while (this.hasUnprocessedMessages) {
+            await this.processMessages()
+        }
+
+        return { stateLeaves, ballots }
+    }
+
+    /**
+     * Process one message only
+     * @param _index The index of the message to process
+     */
+    private processMessage = (_index: number) => {
+        try {
+            // validation
+            assert(_index >= 0 && this.messages.length > _index, 'Poll:processMessage: Invalid index')
+            
+            // ensure that there is the correct number of shared keys
+            assert(this.encPubKeys.length === this.messages.length, 'Poll:processMessage: Invalid number of shared keys')
+
+            // extract the message and the enc pub key 
+            const message = this.messages[_index]
+            const encPubKey = this.encPubKeys[_index]
+
+            // decrypt the message
+            // 1. generate the shared key
+            const sharedKey = Keypair.genEcdhSharedKey(
+                this.coordinatorKeyPair.privKey,
+                encPubKey
+            )
+            // 2. decrypt it
+            const { command, signature } = PCommand.decrypt(message, sharedKey)
+
+            // @todo - work out a better error system 
+            if (command.stateIndex >= BigInt(this.ballots.length) || command.stateIndex < BigInt(1)) 
+                throw new Error("no-op")
+
+            // @todo look at how to handle this error 
+            if (command.stateIndex >= BigInt(this.stateTree.nextIndex)) throw new Error("TODO")
+
+            // this leaf is the signed up user
+            const stateLeaf = this.stateLeaves[Number(command.stateIndex)]
+
+            // the ballot that we are working on 
+            const ballot = this.ballots[Number(command.stateIndex)]
+
+            // if the signature is not valid then throw an error
+            if (!command.verifySignature(signature, stateLeaf.pubKey)) throw new Error("TODO")
+
+            // if the nonce is not valid, then throw
+            if (command.nonce !== ballot.nonce + BigInt(1)) throw new Error("TODO")
+
+            // validate voice credits
+            const prevSpentCred = ballot.votes[Number(command.voteOptionIndex)]
+
+            // @todo check the validity of this 
+            const voiceCreditsLeft = BigInt(100)
+            // const voiceCreditsLeft = stateLeaf.voiceCreditBalance - prevSpentCre
+            /*
+            const voiceCreditsLeft =
+                BigInt(`${stateLeaf.voiceCreditBalance}`) +
+                (BigInt(`${prevSpentCred}`) * BigInt(`${prevSpentCred}`)) -
+                (BigInt(`${command.newVoteWeight}`) * BigInt(`${command.newVoteWeight}`))
+            */
+
+            if (voiceCreditsLeft < BigInt(0)) throw new Error("TODO")
+
+            // we need to check that the vote option is valid
+            if (command.voteOptionIndex < BigInt(0) || command.voteOptionIndex >= this.maxValues.maxVoteOptions) throw new Error("no-op")
+
+            const newStateLeaf = stateLeaf.copy()
+            newStateLeaf.voiceCreditBalance = voiceCreditsLeft 
+            newStateLeaf.pubKey = command.newPubKey.copy()
+
+            const newBallot = ballot.copy()
+            newBallot.nonce = newBallot.nonce + BigInt(1)
+            newBallot.votes[Number(command.voteOptionIndex)] = command.newVoteWeight
+
+            const originalStateLeafPathElements = this.stateTree.genMerklePath(Number(command.stateIndex)).pathElements 
+            const originalBallotPathElements = this.ballotTree.genMerklePath(Number(command.stateIndex)).pathElements
+
+            const originalVoteWeight = ballot.votes[Number(command.voteOptionIndex)]
+            // the vote option tree
+            const vt = new IncrementalQuinTree(
+                this.treeDepths.voteOptionTreeDepth,
+                BigInt(0),
+                5,
+                hash5
+            )
+
+            // @todo why are we looping through ballots[0]? it could have less votes than this one 
+            for (let i = 0; i < this.ballots[0].votes.length; i++) {
+                vt.insert(ballot.votes[i])
+            }
+
+            const originalVoteWeightsPathElements = vt.genMerklePath(command.voteOptionIndex).pathElements
+
+            return {
+                stateLeafIndex: Number(command.stateIndex),
+                newStateLeaf,
+                originalStateLeaf: stateLeaf.copy(),
+                originalVoteWeight,
+                originalVoteWeightsPathElements,
+                newBallot,
+                originalBallot: ballot.copy(),
+                originalBallotPathElements,
+                command 
+            }
+
+        } catch (error: any) {
+            // @todo look into how to design custom errors
+            throw Error("no-op")
+        }
+    }
 
     /**
      * Checks whether the message acc queue was merged
@@ -1013,14 +1212,142 @@ export class Poll {
         ) && (
             this.cbi * this.batchSizes.subsidyBatchSize < this.ballots.length
         )
-        
     }
 
+    /**
+     * Check whether a poll instance is equal to this instance
+     * @param p - The poll instance
+     * @returns whether the poll instance is equal to this instance
+     */
     public equals = (p: Poll): boolean => {
-        return true 
+        const result = 
+            this.coordinatorKeyPair.equals(p.coordinatorKeyPair) &&
+            this.treeDepths.intStateTreeDepth ===
+            p.treeDepths.intStateTreeDepth &&
+            this.treeDepths.messageTreeDepth ===
+            p.treeDepths.messageTreeDepth &&
+            this.treeDepths.messageTreeSubDepth ===
+            p.treeDepths.messageTreeSubDepth &&
+            this.treeDepths.voteOptionTreeDepth ===
+            p.treeDepths.voteOptionTreeDepth &&
+            this.batchSizes.tallyBatchSize === p.batchSizes.tallyBatchSize &&
+            this.batchSizes.messageBatchSize ===
+            p.batchSizes.messageBatchSize &&
+            this.maxValues.maxUsers === p.maxValues.maxUsers &&
+            this.maxValues.maxMessages === p.maxValues.maxMessages &&
+            this.maxValues.maxVoteOptions === p.maxValues.maxVoteOptions &&
+            this.messages.length === p.messages.length &&
+            this.encPubKeys.length === p.encPubKeys.length
+
+        if (!result) return false
+        
+
+        for (let i = 0; i < this.messages.length; i++) 
+            if (!this.messages[i].equals(p.messages[i])) return false        
+    
+        for (let i = 0; i < this.encPubKeys.length; i++) 
+            if (!this.encPubKeys[i].equals(p.encPubKeys[i])) return false
+        
+        // if we havent returned yet it means they are equal 
+        return true
     }
 
+    /**
+     * Create a deep clone of the Poll instance
+     * @returns a deep clone of the Poll instance
+     */
     public copy = (): Poll => {
-        return this 
+        const copied = new Poll(
+            this.pollEndTimestamp,
+            this.coordinatorKeyPair.copy(),
+            {
+                intStateTreeDepth: this.treeDepths.intStateTreeDepth,
+                messageTreeDepth: this.treeDepths.messageTreeDepth,
+                messageTreeSubDepth: this.treeDepths.messageTreeSubDepth,
+                voteOptionTreeDepth: this.treeDepths.voteOptionTreeDepth,
+            },
+            {
+                tallyBatchSize: this.batchSizes.tallyBatchSize,
+                subsidyBatchSize: this.batchSizes.subsidyBatchSize,
+                messageBatchSize: this.batchSizes.messageBatchSize,
+            },
+            {
+                maxUsers: this.maxValues.maxUsers,
+                maxMessages: this.maxValues.maxMessages,
+                maxVoteOptions: this.maxValues.maxVoteOptions
+            },
+            this.maciStateRef,
+            this.pollId
+        )
+
+        copied.stateLeaves = this.stateLeaves.map((x: StateLeaf) => x.copy())
+        copied.messages = this.messages.map((x: Message) => x.copy())
+        copied.commands = this.commands.map((x: Command) => x.copy())
+        copied.ballots = this.ballots.map((x: Ballot) => x.copy())
+        copied.encPubKeys = this.encPubKeys.map((x: PublicKey) => x.copy())
+        if (this.ballotTree) copied.ballotTree = this.ballotTree.copy()
+        copied.currentMessageBatchIndex = this.currentMessageBatchIndex
+        copied.messageAq = this.messageAq.copy()
+        copied.messageTree = this.messageTree.copy()
+        copied.results = this.results.map((x: bigint) => x)
+        copied.perVOSpentVoiceCredits = this.perVOSpentVoiceCredits.map((x: bigint) => x)
+        copied.numBatchesProcessed = this.numBatchesProcessed 
+        copied.numBatchesTallied = this.numBatchesTallied
+        copied.totalSpentVoiceCredits = this.totalSpentVoiceCredits
+        copied.sbSalts = {}
+        copied.resultRootSalts = {}
+        copied.preVOSpentVoiceCreditsRootSalts = {}
+        copied.spentVoiceCreditSubtotalSalts = {}
+
+        for (const k of Object.keys(this.sbSalts)) copied.sbSalts[k] = this.sbSalts[k]
+        for (const k of Object.keys(this.resultRootSalts)) copied.resultRootSalts[k] = this.resultRootSalts[k]
+        for (const k of Object.keys(this.preVOSpentVoiceCreditsRootSalts)) 
+            copied.preVOSpentVoiceCreditsRootSalts[k] = this.preVOSpentVoiceCreditsRootSalts[k]
+        for (const k of Object.keys(this.spentVoiceCreditSubtotalSalts)) 
+            copied.spentVoiceCreditSubtotalSalts[k] = this.spentVoiceCreditSubtotalSalts[k]
+
+        // @todo look if we want to keep the subsidy code 
+        return copied 
+    }
+
+    /**
+     * Generate the commitment to the poll results
+     * @param _salt - The salt to use for the commitment
+     * @returns the commitment (hash of the results tree root and the salt)
+     */
+    public genResultsCommitment = (_salt: bigint): bigint => {
+        const resultsTree = new IncrementalQuinTree(
+            this.treeDepths.voteOptionTreeDepth,
+            BigInt(0),
+            this.VOTE_OPTION_TREE_ARITY,
+            hash5
+        )
+
+        for (const r of this.results) resultsTree.insert(r)
+        
+        return hashLeftRight(resultsTree.root, _salt)
+    }
+
+    /**
+     * Generate a commitment to the total number of voice credits spent
+     * @param _salt - The salt to use for the commitment
+     * @param _numBallotsToCount - How many ballots to count 
+     * @returns the commitment (hash of the total number of voice credits spent and the salt)
+     */
+    public genSpentVoiceCreditSubtotalCommitment = (
+        _salt: bigint,
+        _numBallotsToCount: number 
+    ): bigint => {
+        let subTotal = BigInt(0)
+
+        for (let i = 0; i < _numBallotsToCount; i++)  {
+            if (i >= this.ballots.length) break 
+            for (let j = 0; j < this.results.length; j++) {
+                const v = this.ballots[i].votes[j]
+                subTotal += v * v
+            }
+        }
+
+        return hashLeftRight(subTotal, _salt)
     }
 }
