@@ -7,33 +7,11 @@ import {
     unstringifyBigInts,
     IncrementalQuinTree
 } from './index'
-
-type Leaf = bigint
-
-const deepCopyBigIntArray = (arr: bigint[]) => {
-    return arr.map((x) => BigInt(x.toString()))
-}
-
-const calcDepthFromNumLeaves = (
-    hashLength: number,
-    numLeaves: number,
-) => {
-    let depth = 1
-    while (true) {
-        const max = hashLength ** depth
-        if (BigInt(max) >= numLeaves) {
-            break
-        }
-        depth ++
-    }
-
-    return depth
-}
-
-interface Queue {
-    levels: bigint[][];
-    indices: number[];
-}
+import {
+    Leaf,
+    Queue
+} from "../types/types"
+import { calcDepthFromNumLeaves, deepCopyBigIntArray } from "./utils"
 
 /**
  * An Accumulator Queue which conforms to the implementation in AccQueue.sol.
@@ -127,7 +105,7 @@ export class AccQueue {
 
             this.zeros.push(hashed)
 
-            let e: BigInt[] = []
+            let e: bigint[] = []
             if (this.hashLength === 2) {
                 e = [0].map(BigInt)
                 hashed = this.hashFunc([hashed, hashed])
@@ -144,32 +122,46 @@ export class AccQueue {
         }
     }
 
-    public getSubRoot(_index: number) {
+    /**
+     * Get the subroot at a given index
+     * @param _index - The index of the subroot
+     * @returns the subroot
+     */
+    public getSubRoot(_index: number): bigint {
         return this.subRoots[_index]
     }
 
-    /*
+    /**
      * Enqueue a leaf into the current subtree
      * @param _leaf The leaf to insert.
+     * @returns The index of the leaf
      */
     public enqueue(
         _leaf: Leaf,
     ): number {
-        assert(this.numLeaves < this.hashLength ** this.MAX_DEPTH)
+        // validation 
+        assert(this.numLeaves < this.hashLength ** this.MAX_DEPTH, "AccQueue is full")
 
-        // Ensure that _value is a BigInt
         this._enqueue(_leaf, 0)
 
+        // the index is the number of leaves (0-index)
         const leafIndex = this.numLeaves
 
-        this.numLeaves ++
+        // increase the number of leaves
+        this.numLeaves++
+        // we set merged false because there are new leaves
         this.subTreesMerged = false
+        // reset the smallSRTroot because it is obsolete
         this.smallSRTroot = BigInt(0)
 
+        // @todo this can be moved in the constructor rather than computing every time 
         const subTreeCapacity = this.hashLength ** this.subDepth
+        // If the current subtree is full
         if (this.numLeaves % subTreeCapacity === 0) {
+            // store the subroot 
             this.subRoots[this.currentSubtreeIndex] = this.leafQueue.levels[this.subDepth][0]
-            this.currentSubtreeIndex ++
+            this.currentSubtreeIndex++
+            // reset the current subtree
             this.leafQueue.levels[this.subDepth][0] = BigInt(0)
             for (let i = 0; i < this.MAX_DEPTH; i ++) {
                 this.leafQueue.indices[i] = 0
@@ -179,21 +171,28 @@ export class AccQueue {
         return leafIndex
     }
 
-    private _enqueue(
+    /**
+     * Private function that performs the actual enqueue operation
+     * @param _leaf - The leaf to insert
+     * @param _level - The level of the subtree
+     */
+    private _enqueue = (
         _leaf: Leaf,
         _level: number,
-    ) {
-        if (_level > this.subDepth) {
-            return;
-        }
+    ) => {
+        // small validation, do no throw
+        if (_level > this.subDepth) return
+        
+        // get the index to determine where to insert the next leaf
         const n = this.leafQueue.indices[_level]
 
+        // we check that the index is not the last one (1 or 4 depending on the hash length)
         if (n !== this.hashLength - 1) {
             // Just store the leaf
             this.leafQueue.levels[_level][n] = _leaf
-            this.leafQueue.indices[_level] ++
-            return
+            this.leafQueue.indices[_level]++
         } else {
+            // if not we compute the root 
             let hashed: bigint
             if (this.hashLength === 2) {
                 hashed = this.hashFunc([this.leafQueue.levels[_level][0], _leaf])

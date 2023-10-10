@@ -7,6 +7,14 @@ export type Plaintext = bigint[]
 export type Ciphertext = bigint[]
 
 /**
+ * A acc queue
+ */
+export interface Queue {
+    levels: bigint[][];
+    indices: number[];
+}
+
+/**
  * A private key and a public key
  */
 export interface Keypair {
@@ -34,3 +42,5 @@ export interface PoseidonFuncs {
     4: (inputs: bigint[]) => bigint;
     5: (inputs: bigint[]) => bigint;
 }
+
+export type Leaf = bigint

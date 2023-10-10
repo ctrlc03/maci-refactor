@@ -38,10 +38,19 @@ export class G1Point {
         this.y = _y
     }
 
+    /**
+     * Check whether two points are equal 
+     * @param pt the point to compare with
+     * @returns whether they are equal or not
+     */
     public equals(pt: G1Point): boolean {
         return this.x === pt.x && this.y === pt.y
     }
 
+    /**
+     * Return the point as a contract param in the form of an object
+     * @returns the point as a contract param
+     */
     public asContractParam() {
         return {
             x: this.x.toString(),
@@ -69,6 +78,11 @@ export class G2Point {
         this.y = _y
     }
 
+    /**
+     * Check whether two points are equal 
+     * @param pt the point to compare with
+     * @returns whether they are equal or not
+     */
     public equals(pt: G2Point): boolean {
         return this.x[0] === pt.x[0] &&
                this.x[1] === pt.x[1] &&
@@ -76,6 +90,10 @@ export class G2Point {
                this.y[1] === pt.y[1]
     }
 
+    /**
+     * Return the point as a contract param in the form of an object
+     * @returns the point as a contract param
+     */
     public asContractParam() {
         return {
             x: this.x.map((n) => n.toString()),
@@ -87,8 +105,9 @@ export class G2Point {
 /**
  * Hash an array of uint256 values the same way that the EVM does.
  * @param input - the array of values to hash 
+ * @returns a EVM compatible sha256 hash 
  */
-export const sha256Hash = (input: bigint[]) => {
+export const sha256Hash = (input: bigint[]): bigint => {
     const types: string[] = []
     for (let i = 0; i < input.length; i ++) {
         types.push('uint256')
@@ -105,7 +124,7 @@ export const sha256Hash = (input: bigint[]) => {
  * Hash two BigInts with the Poseidon hash function
  * @param left The left-hand element to hash
  * @param right The right-hand element to hash
- * @return The hash of the two elements
+ * @returns The hash of the two elements
  */
 export const hashLeftRight = (left: bigint, right: bigint): bigint => {
     return poseidonT3([left, right])
@@ -114,8 +133,9 @@ export const hashLeftRight = (left: bigint, right: bigint): bigint => {
 /**
  * Hash up to 2 elements
  * @param inputs The elements to hash
+ * @returns the hash of the elements
  */ 
-export const poseidonT3 = (inputs: bigint[]) => {
+export const poseidonT3 = (inputs: bigint[]): bigint => {
     assert(inputs.length === 2)
     return poseidon(inputs)
 }
@@ -123,8 +143,9 @@ export const poseidonT3 = (inputs: bigint[]) => {
 /**
  * Hash up to 3 elements
  * @param inputs The elements to hash
+ * @returns the hash of the elements
  */ 
-export const poseidonT4 = (inputs: bigint[]) => {
+export const poseidonT4 = (inputs: bigint[]): bigint => {
     assert(inputs.length === 3)
     return poseidon(inputs)
 }
@@ -132,8 +153,9 @@ export const poseidonT4 = (inputs: bigint[]) => {
 /**
  * Hash up to 4 elements
  * @param inputs The elements to hash
+ * @retuns the hash of the elements
  */ 
-export const poseidonT5 = (inputs: bigint[]) => {
+export const poseidonT5 = (inputs: bigint[]): bigint => {
     assert(inputs.length === 4)
     return poseidon(inputs)
 }
@@ -141,8 +163,9 @@ export const poseidonT5 = (inputs: bigint[]) => {
 /**
  * Hash up to 5 elements
  * @param inputs The elements to hash
+ * @returns the hash of the elements
  */ 
-export const poseidonT6 = (inputs: bigint[]) => {
+export const poseidonT6 = (inputs: bigint[]): bigint => {
     assert(inputs.length === 5)
     return poseidon(inputs)
 }
@@ -212,7 +235,7 @@ export const hash13 = (elements: Plaintext): bigint => {
 /**
  * Hash a single BigInt with the Poseidon hash function
  * @param preImage The element to hash
- * @return The hash of the element
+ * @returns The hash of the element
  */
 export const hashOne = (preImage: bigint): bigint => poseidonT3([preImage, BigInt(0)])
 
@@ -224,7 +247,7 @@ export const hashOne = (preImage: bigint): bigint => poseidonT3([preImage, BigIn
  * more than 254 bits. To prevent modulo bias, we then use this efficient
  * algorithm:
  * http://cvsweb.openbsd.org/cgi-bin/cvsweb/~checkout~/src/lib/libc/crypt/arc4random_uniform.c
- * @return A BabyJub-compatible random value.
+ * @returns A BabyJub-compatible random value.
  */
 export const genRandomBabyJubValue = (): bigint => {
     // Prevent modulo bias
@@ -246,7 +269,7 @@ export const genRandomBabyJubValue = (): bigint => {
 
 /**
  * Generate a private key 
- * @return A BabyJub-compatible private key.
+ * @returns A BabyJub-compatible private key.
  */
 export const genPrivKey = (): bigint => {
     return genRandomBabyJubValue()
@@ -254,7 +277,7 @@ export const genPrivKey = (): bigint => {
 
 /**
  * Generate a random value 
- * @return A BabyJub-compatible salt.
+ * @returns A BabyJub-compatible salt.
  */
 export const genRandomSalt = (): bigint => {
     return genRandomBabyJubValue()
@@ -265,7 +288,7 @@ export const genRandomSalt = (): bigint => {
  * with the BabyJub curve. This is the format which should be passed into the
  * PubKey and other circuits.
  * @param privKey A private key generated using genPrivKey()
- * @return A BabyJub-compatible private key.
+ * @returns A BabyJub-compatible private key.
  */
 export const formatPrivKeyForBabyJub = (privKey: PrivKey) => {
     const sBuff = eddsa.pruneBuffer(
@@ -280,7 +303,7 @@ export const formatPrivKeyForBabyJub = (privKey: PrivKey) => {
 /**
  * Losslessly reduces the size of the representation of a public key
  * @param pubKey The public key to pack
- * @return A packed public key
+ * @returns A packed public key
  */
 export const packPubKey = (pubKey: PubKey): Buffer => {
     return babyJub.packPoint(pubKey)
@@ -289,7 +312,7 @@ export const packPubKey = (pubKey: PubKey): Buffer => {
 /**
  * Restores the original PubKey from its packed representation
  * @param packed The value to unpack
- * @return The unpacked public key
+ * @returns The unpacked public key
  */
 export const unpackPubKey = (packed: Buffer): PubKey | any => {
     return babyJub.unpackPoint(packed)
@@ -297,7 +320,7 @@ export const unpackPubKey = (packed: Buffer): PubKey | any => {
 
 /**
  * @param privKey A private key generated using genPrivKey()
- * @return A public key associated with the private key
+ * @returns A public key associated with the private key
  */
 export const genPubKey = (privKey: PrivKey): PubKey => {
     // Check whether privKey is a field element
@@ -323,7 +346,7 @@ export const genKeypair = (): Keypair => {
  * key and a public key.
  * @param privKey A private key generated using genPrivKey()
  * @param pubKey A public key generated using genPubKey()
- * @return The ECDH shared key.
+ * @returns The ECDH shared key.
  */
 export const genEcdhSharedKey = (
     privKey: PrivKey,
@@ -337,7 +360,7 @@ export const genEcdhSharedKey = (
  * @param plaintext The plaintext to encrypt.
  * @param sharedKey The shared key to use for encryption.
  * @param nonce The nonce to use for encryption.
- * @return The ciphertext.
+ * @returns The ciphertext.
  */
 export const encrypt = (
     plaintext: Plaintext,
@@ -358,7 +381,7 @@ export const encrypt = (
  * @param sharedKey The shared key to use for decryption.
  * @param nonce The nonce to use for decryption.
  * @param length The length of the plaintext.
- * @return The plaintext.
+ * @returns The plaintext.
  */
 export const decrypt = (
     ciphertext: Ciphertext,
@@ -379,7 +402,7 @@ export const decrypt = (
  * Generates a signature given a private key and plaintext.
  * @param privKey A private key generated using genPrivKey()
  * @param msg The plaintext to sign.
- * @return The signature.
+ * @returns The signature.
  */
 export const sign = (
     privKey: PrivKey,
@@ -397,7 +420,7 @@ export const sign = (
  * @param msg The plaintext to verify.
  * @param signature The signature to verify.
  * @param pubKey The public key to use for verification.
- * @return True if the signature is valid, and false otherwise.
+ * @returns True if the signature is valid, and false otherwise.
  */
 export const verifySignature = (
     msg: bigint,
@@ -463,6 +486,7 @@ const bitToCurve = (
 
 /**
  * Maps curve point to bit
+ * @param p The point to map.
  * @returns the bit value.
  */
 export const curveToBit = (
@@ -479,6 +503,9 @@ export const curveToBit = (
 
 /** 
  * Perform encryption of a single bit using ElGamal algorithm using randomness y
+ * @param pubKey The public key to use for encryption.
+ * @param bit The bit to encrypt.
+ * @param y The randomness to use for encryption.
  * @returns the cyphertext.
  */
 export const elGamalEncryptBit = (
@@ -492,6 +519,9 @@ export const elGamalEncryptBit = (
 
 /**
  * Performs decryption of the message point encrypted bit using ElGamal encryption algorithm
+ * @param privKey The private key to use for decryption.
+ * @param c1 The first component of the cyphertext.
+ * @param c2 The second component of the cyphertext.
  * @returns the decrypted bit.
  */
 export const elGamalDecryptBit = (
@@ -505,18 +535,18 @@ export const elGamalDecryptBit = (
 
 /**
  * Performs re randomization of the cyphertext encrypted using ElGamal encryption algorithm
- * @param pubKey 
- * @param z 
- * @param c1 
- * @param c2 
- * @returns 
+ * @param pubKey the public key to use for re randomization.
+ * @param z the random scalar value
+ * @param c1 the first part of the cyphertext
+ * @param c2 the second part of the cyphertext
+ * @returns the re-randomized cyphertext
  */
 export const elGamalRerandomize = (
     pubKey: PubKey,
     z: BigInt,
     c1: BigInt[],
     c2: BigInt[],
-) => {
+): bigint[] => {
     // c1' = z*G + c1
     // c2' = pubKey * z + c2
 
@@ -533,5 +563,10 @@ export const elGamalRerandomize = (
     return [c1r, c2r]
 }
 
-
+/**
+ * Sums two points on the jubjub curve
+ * @param a The first point
+ * @param b The second point
+ * @returns the sum of the two points
+ */
 export const babyJubAddPoint = (a: any, b: any) => babyJub.addPoint(a,b)

@@ -100,7 +100,6 @@ export class MaciState {
         return leafIndex
     }
 
-    // @todo do we really need both duration and end timestamp?
     /**
      * Deploy a new poll
      * @param _pollEndTimestamp When the poll should end

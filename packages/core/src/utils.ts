@@ -6,7 +6,7 @@ import { IncrementalQuinTree, hash5, hashLeftRight } from "../../crypto/src"
 * hash.
 * @param results A list of vote weights
 * @param salt A random salt
-* @return The hash of the results and the salt, with the salt last
+* @returns The hash of the results and the salt, with the salt last
 */
 export const genTallyResultCommitment = (
    results: bigint[],

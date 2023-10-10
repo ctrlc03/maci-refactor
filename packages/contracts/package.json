@@ -5,6 +5,7 @@
     "build": "hardhat compile",
     "node": "hardhat node",
     "typechain": "hardhat typechain",
+    "docs": "hardhat docgen",
     "deploy:local": "hardhat run ./scripts/deploy.ts --network hardhat",
     "deploy:mainnet": "hardhat run ./scripts/deploy.ts --network mainnet"
   },
@@ -25,6 +26,7 @@
     "@types/jest": "^29.5.4",
     "@types/mocha": "^10.0.1",
     "chai-as-promised": "^7.1.1",
+    "solidity-docgen": "^0.6.0-beta.36",
     "ts-node": "^10.9.1",
     "typechain": "^8.3.1",
     "typescript": "^5.2.2"

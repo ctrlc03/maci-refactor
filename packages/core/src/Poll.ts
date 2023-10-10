@@ -725,10 +725,9 @@ export class Poll {
      * Note that this function will only process as many state leaves as there
      * are ballots to prevent accidental inclusion of a new user after this
      * poll has concluded.
-     * @return The inputs for the processMessages circuit
+     * @returns The inputs for the processMessages circuit
      */
-    public processMessages = async (
-    ): Promise<any> => {
+    public processMessages = async (): Promise<any> => {
         // validation first
         assert(this.hasUnprocessedMessages(), 'Poll:processMessages, No more messages to process')
         assert(this.isMessageAqMerged(), 'Poll:processMessages, Message accumulator queue must be merged')
@@ -817,7 +816,7 @@ export class Poll {
                         currentStateLeaves.unshift(r.originalStateLeaf)
                         currentBallots.unshift(r.originalBallot)
                         currentVoteWeights.unshift(r.originalVoteWeight)
-                        currentVoteWeightsPathElements.unshift(r.originalVoteWeightPathElements)
+                        currentVoteWeightsPathElements.unshift(r.originalVoteWeightsPathElements)
                         currentStateLeavesPathElements.unshift(r.originalStateLeafPathElements)
                         currentBallotsPathElements.unshift(r.originalBallotPathElements)
 
@@ -960,7 +959,7 @@ export class Poll {
     /**
      * Generates inputs for the processMessages circuit
      * @param _index 
-     * @return The inputs for the processMessages circuit
+     * @returns The inputs for the processMessages circuit
      */
     public genProcessMessagesCircuitInputsPartial = async (
         _index: number 
@@ -1063,7 +1062,7 @@ export class Poll {
      * Process all messages. This function does not update the ballots or state
      * leaves; rather, it copies and then updates them. This makes it possible
      * to test the result of multiple processMessage() invocations.
-     * @return The state leaves and ballots after processing all messages
+     * @returns The state leaves and ballots after processing all messages
      */
     public processAllMessages = async () => {
         if (!this.stateCopied) this.copyStateFromMaci()
@@ -1170,6 +1169,7 @@ export class Poll {
                 stateLeafIndex: Number(command.stateIndex),
                 newStateLeaf,
                 originalStateLeaf: stateLeaf.copy(),
+                originalStateLeafPathElements,
                 originalVoteWeight,
                 originalVoteWeightsPathElements,
                 newBallot,
@@ -1182,6 +1182,21 @@ export class Poll {
             // @todo look into how to design custom errors
             throw Error("no-op")
         }
+    }
+
+    /**
+     * Tally a batch of Ballots and update the result
+     * @todo implement 
+     */
+    public tallyVotes = () => {
+        // validation 
+        assert(this.hasUntalliedBallots(), 'Poll:tallyVotes: No more ballots to tally')
+        
+        const batchSize = this.batchSizes.tallyBatchSize
+        const batchStartIndex = this.numBatchesTallied * batchSize 
+
+        const currentResultsRootSalt = batchStartIndex === 0 ? BigInt(0) : this.resultRootSalts[batchStartIndex - batchSize]
+
     }
 
     /**
@@ -1204,7 +1219,7 @@ export class Poll {
 
     /**
      * Check if there are any unprocessed subsidy calculations
-     * @return Whether there are any unprocessed subsidy calculations
+     * @returns Whether there are any unprocessed subsidy calculations
      */
     public hasUnfinishedSubsidyCalculation = () => {
         return (
@@ -1241,7 +1256,6 @@ export class Poll {
 
         if (!result) return false
         
-
         for (let i = 0; i < this.messages.length; i++) 
             if (!this.messages[i].equals(p.messages[i])) return false        
     

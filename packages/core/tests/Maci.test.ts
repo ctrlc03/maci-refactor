@@ -6,7 +6,6 @@ import { Keypair, PrivateKey, PublicKey, StateLeaf, blankStateLeafHash } from ".
 import { MaxValues, TreeDepths } from "../types"
 
 describe("MaciState", () => {
-
     const maxValues: MaxValues = {
         maxUsers: 100,
         maxMessages: 100,
@@ -105,29 +104,6 @@ describe("MaciState", () => {
         )
 
         expect(stateIndex).toEqual(1)
-
-        maciState.stateAq.mergeSubRoots(0)
-        maciState.stateAq.merge(STATE_TREE_DEPTH)
-        expect(maciState.stateAq.getRoot(STATE_TREE_DEPTH)).toEqual(stateTree.root)
-    })
-
-    test.skip("the state root should be correct after 2 signups", () => {
-        const timestamp = BigInt(Date.now().valueOf())
-        const stateLeaf = new StateLeaf(
-            userPubKey,
-            voiceCreditBalance,
-            timestamp 
-        )
-
-        stateTree.insert(stateLeaf.hash())
-
-        const stateIndex = maciState.signUp(
-            userPubKey,
-            voiceCreditBalance,
-            timestamp
-        )
-
-        expect(stateIndex).toEqual(25)
 
         maciState.stateAq.mergeSubRoots(0)
         maciState.stateAq.merge(STATE_TREE_DEPTH)

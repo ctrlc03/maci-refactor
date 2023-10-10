@@ -5,7 +5,9 @@ export {
 export {
     stringifyBigInts,
     unstringifyBigInts,
-    bigInt2Buffer
+    bigInt2Buffer,
+    deepCopyBigIntArray,
+    calcDepthFromNumLeaves
 } from "./utils"
 
 export {

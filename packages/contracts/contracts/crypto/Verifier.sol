@@ -38,7 +38,7 @@ contract Verifier is IVerifier, SnarkConstants {
     string constant ERROR_INPUT_VAL = "VE2";
 
     /*
-     * @returns Whether the proof is valid given the verifying key and public
+     * @return Whether the proof is valid given the verifying key and public
      *          input. Note that this function only supports one public input.
      *          Refer to the Semaphore source code for a verifier that supports
      *          multiple public inputs.
