@@ -1,14 +1,19 @@
 {
-    "name": "maci-cli",
-    "version": "1.1.2",
-    "scripts": {
-      "build": "tsc"
-    },
-    "module": "src/index.ts",
-    "devDependencies": {
-      "bun-types": "latest"
-    },
-    "peerDependencies": {
-      "typescript": "^5.0.0"
-    }
+  "name": "maci-cli",
+  "version": "1.1.2",
+  "description": "a cli interface to interact with MACI",
+  "author": "PSE",
+  "scripts": {
+    "build": "tsc"
+  },
+  "module": "src/index.ts",
+  "devDependencies": {
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0"
   }
+}

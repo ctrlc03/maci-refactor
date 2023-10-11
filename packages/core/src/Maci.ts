@@ -79,17 +79,22 @@ export class MaciState {
         _initialVoiceCreditBalance: bigint,
         _timestamp: bigint
     ): number => {
+        // we create a leaf with the public key, 
+        // the initial voice credit balance and the timestamp
         const stateLeaf = new StateLeaf(
             _pubKey,
             _initialVoiceCreditBalance,
             _timestamp
         )
 
+        // signup leaves hashes go into the state acc queue
         const leafIndex = this.stateAq.enqueue(
             stateLeaf.hash()
         )
 
+        // we also insert the leaf hash into the state tree
         this.stateTree.insert(stateLeaf.hash())
+        // and save a copy of the leaf
         this.stateLeaves.push(stateLeaf.copy())
 
         // increase number of signups recorded
@@ -117,18 +122,19 @@ export class MaciState {
         _coordinatorKeypair: Keypair
     ): number => {
         // create the new poll object
+        // @todo we might want to save the subsidy and tally batch sizes to a class property
         const poll: Poll = new Poll(
-            _pollEndTimestamp,
-            _coordinatorKeypair,
-            _treeDepths,
+            _pollEndTimestamp, // when the poll is supposed to end 
+            _coordinatorKeypair, // the coordinator keypair
+            _treeDepths, // the depth of the trees
             {
                 messageBatchSize: _messageBatchSize,
                 subsidyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
                 tallyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
-            },
-            _maxValues,
-            this,
-            this.polls.length
+            }, // the batch sizes to process messages
+            _maxValues, // the max values for the circuit params
+            this, // a reference to MaciState
+            this.polls.length // the id 
         )
 
         // save it 
@@ -139,7 +145,7 @@ export class MaciState {
 
     /**
      * Deploy a null Poll 
-     * @todo check whether this can be omitted
+     * @todo check whether this can be removed
      */
     public deployNullPoll() { 
         // @ts-ignore

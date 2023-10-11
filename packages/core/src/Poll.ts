@@ -60,36 +60,50 @@ import {
  * @author PSE 
  */
 export class Poll {
-    // @notice store the keypair of the coordinator (we only use the public key on chain)
+    // store the keypair of the coordinator (we only use the public key on chain)
     public coordinatorKeyPair: Keypair
-    // @notice the depths of the trees
+    // the depths of the trees
     public treeDepths: TreeDepths
-    // @notice the batches sizes for more efficient processing
+    // the batches sizes for more efficient processing
     public batchSizes: BatchSizes
-    // @notice the max values to conform with the 
+    // the max values to conform with the 
     public maxValues: MaxValues
 
-    // @todo 
+    // @todo look where to move this 
     public msgQueueSizeForProcessDeactivationMessagesCircuit = 5 
 
+    // how many users signed up (from maci state)
     public numSignUps: number 
+    // poll end timestamp
     public pollEndTimestamp: number 
+    // a copy of all ballots
     public ballots: Ballot[] = []
+    // the mekle tree holding all ballots
     public ballotTree: IncrementalQuinTree
 
+    // a copy of all messages 
     public messages: Message[] = []
+    // an accumulator queue holding these messages
     public messageAq: AccQueue
+    // the merkle tree holding all messages
     public messageTree: IncrementalQuinTree
+    // a copy of all commands
     public commands: Command[] = []
 
+    // a copy of all encrypted public keys
     public encPubKeys: PublicKey[] = []
+    // configs for the merkle trees
     public STATE_TREE_ARITY = 5
     public MESSAGE_TREE_ARITY = 5
     public VOTE_OPTION_TREE_ARITY = 5
     public DEACT_KEYS_TREE_ARITY = 5
 
+    // at times we need to copy the state from the maci instance
+    // this flag is used to check whether we have already copied the state
     public stateCopied = false
+    // all of the state leaves (signups)
     public stateLeaves: StateLeaf[] = [blankStateLeaf]
+    // the merkle tree holding these state leaves
     public stateTree = new IncrementalQuinTree(
         STATE_TREE_DEPTH,
         blankStateLeafHash,
@@ -99,35 +113,52 @@ export class Poll {
 
     // For key deactivation
     public deactivatedKeysChainHash = DEACT_MESSAGE_INIT_HASH
+    // a merkle tree holding all deactivated keys 
     public deactivatedKeysTree = new IncrementalQuinTree(
         DEACT_KEYS_TREE_DEPTH,
         DEACT_MESSAGE_INIT_HASH,
         this.DEACT_KEYS_TREE_ARITY,
         hash5,
     )
+    // hold a copy of all messages
     public deactivationMessages: Message[] = []
+    // hold a copy of all encrypted public keys 
     public deactivationEncPubKeys: PublicKey[] = []
+    // hold all deactivation commands
     public deactivationCommands: PCommand[] = []
+    // hold all deactivation signatures
     public deactivationSignatures: Signature[] = []
+    // store how many new keys were generated
     public numKeyGens: number = 0
-    public nullifiersTree: smt.SMT;
+    // a tree to hold nullifiers
+    public nullifiersTree: smt.SMT
 
     // For message processing
+    // how many batches we processed so far
     public numBatchesProcessed = 0
-    public currentMessageBatchIndex: number 
+    // the index of the current batch
+    public currentMessageBatchIndex: number
+
+    // reference to the maci state
     public maciStateRef: MaciState
+    // the id of this poll
     public pollId: number
 
+    // subsidy salts
     public sbSalts: { [key: number]: bigint } = {}
+    // the salts for the results
     public resultRootSalts: { [key: number]: bigint } = {}
     public preVOSpentVoiceCreditsRootSalts: { [key: number]: bigint } = {}
     public spentVoiceCreditSubtotalSalts: { [key: number]: bigint } = {}
 
     // For vote tallying
     public results: bigint[] = []
+    // how many credits were spent per vote option
     public perVOSpentVoiceCredits: bigint[] = []
+    // how many batches we tallied
     public numBatchesTallied = 0
 
+    // how many voice credits were spent in total
     public totalSpentVoiceCredits: bigint = BigInt(0)
 
     // For coefficient and subsidy calculation
@@ -140,7 +171,7 @@ export class Poll {
 
     // used to store info about deactivatedKey events happening on chain 
     // so we can use it to search for deactivatedKeyIndex
-    public deactivatedKeyEvents: DeactivatedKeyEvent[] = [];
+    public deactivatedKeyEvents: DeactivatedKeyEvent[] = []
 
     /**
      * Generate a new Poll instance
@@ -161,14 +192,17 @@ export class Poll {
         _maciStateRef: MaciState,
         _pollId: number 
     ) {
+        // save the properties
         this.pollEndTimestamp = _pollEndTimestamp
         this.coordinatorKeyPair = _coordinatorKeypair
         this.treeDepths = _treeDepths
         this.batchSizes = _batchSizes
         this.maxValues = _maxValues
         this.maciStateRef = _maciStateRef
+        this.numSignUps = this.maciStateRef.numSignUps 
+        this.pollId = _pollId
 
-        // this.numSignups = this.maciStateRef.numSignups 
+        // create a new message tree to store the messages
         this.messageTree = new IncrementalQuinTree(
             this.treeDepths.messageTreeDepth,
             NOTHING_UP_MY_SLEEVE,
@@ -194,8 +228,6 @@ export class Poll {
             this.treeDepths.voteOptionTreeDepth
         )
         this.ballots.push(blankBallot)
-
-        this.pollId = _pollId
     }
 
     /**
@@ -204,130 +236,6 @@ export class Poll {
     public initNullifiersTree = async () => {
         this.nullifiersTree = await smt.newMemEmptyTrie()
         await this.nullifiersTree.insert(0, 0)
-    }
-
-    /**
-     * @notice Allows to generate a new Key (msg type == 3)
-     * @param _message 
-     * @param _encPubKey
-     * @param _newStateIndex
-     */
-    public generateNewKey = (
-        _message: Message,
-        _encPubKey: PublicKey,
-        _newStateIndex: bigint 
-    ) => {
-        // validation 
-        assert(_message.msgType === BigInt(3), "Poll:generateNewKey: message type must be 3")
-        assert(
-            _encPubKey.rawPubKey[0] < SNARK_FIELD_SIZE && 
-            _encPubKey.rawPubKey[1] < SNARK_FIELD_SIZE,
-            "Poll:generateNewKey: public key must be less than SNARK_FIELD_SIZE"
-        )
-
-        for (const d of _message.data) 
-            assert(d < SNARK_FIELD_SIZE, "Poll:generateNewKey: data must be less than SNARK_FIELD_SIZE")
-
-        // save key and message
-        this.encPubKeys.push(_encPubKey)
-        this.messages.push(_message)
-
-        const messageLeaf = _message.hash(_encPubKey)
-        this.messageAq.enqueue(messageLeaf)
-        this.messageTree.insert(messageLeaf)
-
-        // decrypt the message and store the command 
-        const sharedKey = Keypair.genEcdhSharedKey(
-            this.coordinatorKeyPair.privKey,
-            _encPubKey
-        )
-
-        try {
-            const { command } = KCommand.decrypt(
-                _message,
-                sharedKey
-            )
-            command.setNewStateIndex(_newStateIndex)
-            this.numKeyGens++
-            this.commands.push(command)
-        } catch (error: any) {
-            // if there is an error decrypting, we add a empty command
-            const keyPair = new Keypair()
-            let command = new KCommand(keyPair.pubKey, BigInt(0), BigInt(0), [BigInt(0), BigInt(0)], [BigInt(0), BigInt(0)], BigInt(0))
-            this.commands.push(command)
-        }
-    }
-
-    /**
-     * @notice Save the key event event
-     * @param _keyHash - the hash of the key 
-     * @param _c1 
-     * @param _c2 
-     */
-    public processDeactivatedKeyEvent = (
-        _keyHash: bigint, 
-        _c1: bigint[],
-        _c2: bigint[]
-    ) => {
-        const deactivatedKeyEvent: DeactivatedKeyEvent = {
-            keyHash: _keyHash,
-            c1: _c1,
-            c2: _c2
-        }
-
-        this.deactivatedKeyEvents.push(deactivatedKeyEvent)
-    }
-
-    /**
-     * @notice Deactivate a key (msg type == 1)
-     * @param _message 
-     * @param _encPubKey 
-     */
-    public deactivateKey = (
-        _message: Message,
-        _encPubKey: PublicKey
-    ) => {
-        // validation 
-        assert(_message.msgType === BigInt(1), "Poll:deactivateKey: message type must be 1")
-        assert(
-            _encPubKey.rawPubKey[0] < SNARK_FIELD_SIZE && 
-            _encPubKey.rawPubKey[1] < SNARK_FIELD_SIZE,
-            "Poll:deactivateKey: public key must be less than SNARK_FIELD_SIZE"
-        )
-
-        for (const d of _message.data) 
-            assert(d < SNARK_FIELD_SIZE, "Poll:deactivateKey: data must be less than SNARK_FIELD_SIZE")
-
-        this.deactivationMessages.push(_message)
-
-        const messageHash = _message.hash(_encPubKey)
-
-        // update the chain hash 
-        this.deactivatedKeysChainHash = hash2([this.deactivatedKeysChainHash, messageHash])
-        
-        // store the enc pub key
-        this.deactivationEncPubKeys.push(_encPubKey)
-
-        // decrypt the message and store the Command 
-        const sharedKey = Keypair.genEcdhSharedKey(
-            this.coordinatorKeyPair.privKey,
-            _encPubKey
-        )
-
-        try {
-            const { command, signature } = PCommand.decrypt(
-                _message,
-                sharedKey
-            )
-
-            this.deactivationSignatures.push(signature)
-            this.deactivationCommands.push(command)
-        } catch (error: any) {
-            const keyPair = new Keypair()
-            const command = new PCommand(BigInt(1), keyPair.pubKey, BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0))
-            this.deactivationCommands.push(command)
-            this.deactivationSignatures.push({} as Signature)
-        }
     }
 
     /**
@@ -344,6 +252,8 @@ export class Poll {
         )
         this.stateTree = this.maciStateRef.stateTree.copy()
 
+        // @todo look into this - why we create one in the constructor 
+        // for instance in the constructor we do not add to the ballot tree
         // Create as many ballots as state leaves
         const emptyBallot = new Ballot(
             this.maxValues.maxVoteOptions,
@@ -358,19 +268,23 @@ export class Poll {
         )
         this.ballotTree.insert(emptyBallotHash)
 
+        // @todo look into why we do this
+        // @todo we instert a empty ballot for each of the sign ups 
         while (this.ballots.length < this.stateLeaves.length) {
             this.ballotTree.insert(emptyBallotHash)
             this.ballots.push(emptyBallot)
         }
 
-        this.numSignUps = Number(this.maciStateRef.numSignUps.toString()) // TODO: Collect num generated
+        // update the number of users signed up 
+        this.numSignUps = this.maciStateRef.numSignUps
 
         this.stateCopied = true
     }
 
     /**
      * Processes a topup message
-     * @param {Message} _message 
+     * @notice a top up message is of type 2
+     * @param _message - the topup message object
      */
     public topupMessage = (
         _message: Message,
@@ -383,13 +297,17 @@ export class Poll {
         // store the message
         this.messages.push(_message)
 
+        // @note this is the public key we use in the smart contracts
+        // to pad the top up message
         const padKey = new PublicKey([
             BigInt('10457101036533406547632367118273992217979173478358440826365724437999023779287'),
             BigInt('19824078218392094440610104313265183977899662750282163392862422243483260492317'),
         ])
 
         this.encPubKeys.push(padKey)
+        // we hash the message to create a leaf
         const messageLeaf = _message.hash(padKey)
+        // and add it to the acc queue and the tree
         this.messageAq.enqueue(messageLeaf)
         this.messageTree.insert(messageLeaf)
 
@@ -400,12 +318,15 @@ export class Poll {
             BigInt(this.pollId)
         )
 
+        // save the command 
         this.commands.push(command)
     }
 
     /**
      * @notice Insert a Message and the pub key used to generate the 
      * shared key which encrypted the message
+     * @param _message - The message object
+     * @param _encPubKey - The public key used to encrypt the message
      */
     public publishMessage = (
         _message: Message,
@@ -427,6 +348,7 @@ export class Poll {
 
         // hash the message
         const messageLeaf = _message.hash(_encPubKey)
+        // store it in the acc queue and the tree
         this.messageAq.enqueue(messageLeaf)
         this.messageTree.insert(messageLeaf)
 
@@ -436,6 +358,7 @@ export class Poll {
             _encPubKey
         )
 
+        // wrap the decryption in a try catch block
         try {
             const { command } = PCommand.decrypt(
                 _message,
@@ -444,7 +367,7 @@ export class Poll {
             this.commands.push(command)
         } catch (error: any) {
             const keyPair = new Keypair()
-            // @note check that the message type is correct (in the original version it was 0)
+            // @todo check that the message type is correct (in the original version it was 0)
             const command = new PCommand(BigInt(1), keyPair.pubKey, BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0))
             this.commands.push(command)
         }
@@ -457,263 +380,8 @@ export class Poll {
         this.messageAq.mergeSubRoots(0)
         this.messageAq.merge(this.treeDepths.messageTreeDepth)
         // ensure that the message aq was merged
+        // this checks that the acc queue subtree root is the same as the tree root
         assert(this.isMessageAqMerged(), "Poll:mergeAllMessages: message aq must be merged")
-    }
-
-    /**
-     * Check whether there are any unprocessed messages
-     * @returns true if there are unprocessed messages, false otherwise
-     */
-    public hasUnprocessedMessages = (): boolean => {
-        const batchSize = this.batchSizes.messageBatchSize
-
-        // calculate how many batches there are based on the
-        // num of messages stored
-        let totalBatches =
-            this.messages.length <= batchSize ?
-                1 :
-                Math.floor(this.messages.length / batchSize)
-
-        // if there are any messages left over, add another batch
-        if (this.messages.length % batchSize !== 0) 
-            totalBatches++
-        
-        return this.numBatchesProcessed < totalBatches
-    }
-
-    /**
-     * Process the key deactivation messages
-     * @param {bigint} _seed 
-     */
-    public processDeactivationMessages = (_seed: bigint) => {
-        const maskingValues: bigint[] = []
-        const elGamalEnc: Ciphertext[][] = []
-        const deactivatedLeaves: DeactivatedKeyLeaf[] = []
-
-        // if we haven't copied the state yet from the maci instance
-        // then copy it
-        if (!this.stateCopied) this.copyStateFromMaci()
-
-        let mask = _seed 
-        let computedStateIndex = 0
-
-        const stateLeafPathElements: bigint[] = []
-        const currentStateLeaves: bigint[][] = []
-
-        // loop through all key deactivation messages
-        for (let i = 0; i < this.deactivationMessages.length; i++) {
-            const deactivationCommand = this.deactivationCommands[i]
-            const signature = this.deactivationSignatures[i]
-
-            // unwrap the command 
-            const {
-                stateIndex,
-                newPubKey,
-                voteOptionIndex,
-                newVoteWeight,
-                salt 
-            } = deactivationCommand
-
-            const stateIndexInt = parseInt(stateIndex.toString()) 
-            computedStateIndex = 
-                stateIndexInt > 0 && stateIndexInt < this.numSignUps 
-                ?
-                    stateIndexInt - 1
-                :
-                    -1
-
-            let pubKey: PublicKey
-            if (computedStateIndex !== -1) {
-                pubKey = this.stateLeaves[stateIndexInt].pubKey
-                stateLeafPathElements.push(this.stateTree.genMerklePath(stateIndexInt).pathElements)
-                currentStateLeaves.push(this.stateLeaves[stateIndexInt].asCircuitInputs())
-            } else {
-                // if the state index was 0 or greater than the number of signups
-                pubKey = new PublicKey([BigInt(0), BigInt(0)])
-                stateLeafPathElements.push(this.stateTree.genMerklePath(0).pathElements)
-                // push the blank state leaf
-                currentStateLeaves.push(this.stateLeaves[0].asCircuitInputs())
-            }
-
-            // verify that the deactivation message was correct
-            const status = 
-                // cmd type must be 1
-                deactivationCommand.cmdType === BigInt(1) &&
-                // there must be a signature
-                signature !== null &&
-                // the signature must be valid 
-                verifySignature(
-                    deactivationCommand.hash(),
-                    signature,
-                    pubKey.rawPubKey
-                )
-                // @todo check the following lines
-                // && newPubKey.rawPubKey[0].toString() == '0'
-                // && newPubKey.rawPubKey[1].toString() == '0'
-                // && voteOptionIndex.toString() == '0'
-                // && newVoteWeight.toString() == '0'
-
-            mask = hash2([mask, salt])
-            maskingValues.push(mask)
-
-            // encrypt the coordinator pub key, status and mask 
-            const [c1, c2] = elGamalEncryptBit(
-                this.coordinatorKeyPair.pubKey.rawPubKey,
-                status ? BigInt(1) : BigInt(0),
-                mask 
-            )
-
-            elGamalEnc.push([c1, c2])
-
-            // create the leaf
-            const deactivatedLeaf = new DeactivatedKeyLeaf(
-                pubKey,
-                c1, 
-                c2,
-                salt 
-            )
-            // store it and its hash 
-            this.deactivatedKeysTree.insert(deactivatedLeaf.hash())
-            deactivatedLeaves.push(deactivatedLeaf)
-        }
-
-        // pad the deactivation key array with empty keys
-        for (let i = this.deactivationEncPubKeys.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i++) 
-            this.deactivationEncPubKeys.push(new PublicKey([BigInt(0), BigInt(0)]))
-        
-        const deactivatedTreePathElements: any[] = [];
-        for (let i = 0; i < this.deactivationMessages.length; i += 1) {
-            const merklePath = this.deactivatedKeysTree.genMerklePath(i);
-            deactivatedTreePathElements.push(merklePath.pathElements);
-        }
-
-        // Pad deactivatedTreePathElements array
-        for (let i = this.deactivationMessages.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
-            deactivatedTreePathElements.push(this.stateTree.genMerklePath(0).pathElements)
-        }
-    
-        // Pad stateLeafPathElements array
-        for (let i = stateLeafPathElements.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
-            stateLeafPathElements.push(this.stateTree.genMerklePath(0).pathElements)
-        }
-    
-        // Pad currentStateLeaves array
-        for (let i = currentStateLeaves.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
-            currentStateLeaves.push(blankStateLeaf.asCircuitInputs())
-        }
-
-        // Pad deactivationMessages array
-        for (let i = this.deactivationMessages.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
-            const padMask = genRandomSalt();
-            const [padc1, padc2] = elGamalEncryptBit(
-                this.coordinatorKeyPair.pubKey.rawPubKey,
-                BigInt(0),
-                padMask,
-            )
-
-            maskingValues.push(padMask);
-            elGamalEnc.push([padc1, padc2]);
-            this.deactivationMessages.push(new Message(BigInt(0), Array(10).fill(BigInt(0))))
-        }
-
-        const circuitInputs = stringifyBigInts({
-            coordPrivKey: this.coordinatorKeyPair.privKey.asCircuitInputs(),
-            coordPubKey: this.coordinatorKeyPair.pubKey.rawPubKey,
-            encPubKeys: this.deactivationEncPubKeys.map(k => k.asCircuitInputs()),
-            msgs: this.deactivationMessages.map(m => m.asCircuitInputs()),
-            deactivatedTreePathElements,
-            stateLeafPathElements: stateLeafPathElements,
-            currentStateLeaves: currentStateLeaves,
-            elGamalEnc,
-            maskingValues,
-            deactivatedTreeRoot: this.deactivatedKeysTree.root,
-            currentStateRoot: this.stateTree.root,
-            numSignUps: this.numSignUps,
-            chainHash: this.deactivatedKeysChainHash,
-            inputHash: sha256Hash([
-                this.deactivatedKeysTree.root,
-                this.numSignUps,
-                this.stateTree.root,
-                this.deactivatedKeysChainHash,
-            ]),
-        })
-
-        return { circuitInputs, deactivatedLeaves }
-    }   
-
-    /**
-     * Generate the circuit inputs for generating a new key 
-     * @param newPublicKey 
-     * @param deactivatedPrivateKey 
-     * @param deactivatedPublicKey 
-     * @param coordinatorPublicKey 
-     * @param stateIndex 
-     * @param newCreditBalance 
-     * @param salt 
-     */
-    public generateCircuitInputsForGenerateNewKey = (
-        newPublicKey: PublicKey,
-        deactivatedPrivateKey: PrivateKey,
-        deactivatedPublicKey: PublicKey,
-        coordinatorPublicKey: PublicKey,
-        stateIndex: bigint,
-        newCreditBalance: bigint,
-        salt: bigint,
-    ) => {
-        if (!this.stateCopied) this.copyStateFromMaci()
-
-        const deactivatedKeyHash = hash3([...deactivatedPublicKey.asArray(), salt])
-        const deactivatedKeyIndex = this.deactivatedKeyEvents.findIndex(d => d.keyHash.toString() == deactivatedKeyHash.toString())
-
-        if (deactivatedKeyIndex == -1) {
-            throw new Error('Poll:generateCircuitInputsForGenerateNewKey: deactivated key not found')
-        }
-
-        const deactivatedKeyEvent = this.deactivatedKeyEvents[deactivatedKeyIndex]
-
-        // @note in the original version it was fixed to 42 
-        const z = genRandomSalt()
-        // const z = BigInt(42)
-
-        const [c1r, c2r] = elGamalRerandomize(
-            coordinatorPublicKey.rawPubKey,
-            z,
-            deactivatedKeyEvent.c1,
-            deactivatedKeyEvent.c2
-        )
-
-        if (this.deactivatedKeysTree.nextIndex === 0) 
-            this.deactivatedKeyEvents.forEach(dke => {
-                const deactivatedLeafHash = hash5([dke.keyHash, ...dke.c1, ...dke.c2])
-                this.deactivatedKeysTree.insert(deactivatedLeafHash)
-            })
-        
-        const nullifier = hash2([BigInt(deactivatedPrivateKey.asCircuitInputs()), salt])
-
-        const kCommand: KCommand = new KCommand(
-            newPublicKey,
-            newCreditBalance,
-            nullifier,
-            c1r, 
-            c2r,
-            BigInt(this.pollId)
-        )
-
-        return kCommand.prepareValues(
-            deactivatedPrivateKey,
-            this.stateLeaves,
-            this.stateTree,
-            BigInt(this.numSignUps),
-            stateIndex,
-            salt,
-            coordinatorPublicKey,
-            this.deactivatedKeysTree,
-            BigInt(deactivatedKeyIndex),
-            z,
-            deactivatedKeyEvent.c1,
-            deactivatedKeyEvent.c2
-        )
-
     }
 
     /**
@@ -741,14 +409,16 @@ export class Poll {
         // e.g if there are 8 messages and the batch size is 5, then
         // the starting index should be 5.
         if (this.numBatchesProcessed === 0) 
+            // if we haven't processed any batches, then the index shuold not be defined
             assert(this.currentMessageBatchIndex === undefined)
             // prevent other batches from being processed
             this.maciStateRef.pollBeingProcessed = true
             this.maciStateRef.currentPollBeingProcessed = this.pollId  
 
-        // @todo look if we can move this up 
+        // we check that if there is any poll being processed, it is this one
         if (this.maciStateRef.pollBeingProcessed) assert(this.maciStateRef.currentPollBeingProcessed === this.pollId)
 
+        // this will only run once, before the first batch is processed 
         if (this.numBatchesProcessed === 0) {
             const r = this.messages.length % batchSize 
 
@@ -764,11 +434,15 @@ export class Poll {
         }
 
         // we want to ensure that the starting index is valid 
-        assert(this.currentMessageBatchIndex >= 0 && this.currentMessageBatchIndex % batchSize === 0, 'Poll:processMessages, Invalid current message batch index')
+        assert(
+            this.currentMessageBatchIndex >= 0 && this.currentMessageBatchIndex % batchSize === 0, 
+            'Poll:processMessages, Invalid current message batch index'
+        )
 
         // ensure we copied MACI's state
         if (!this.stateCopied) this.copyStateFromMaci()
 
+        // start building the circuit inputs object
         const circuitInputs = stringifyBigInts(
             await this.genProcessMessagesCircuitInputsPartial(this.currentMessageBatchIndex)
         )
@@ -1196,6 +870,386 @@ export class Poll {
         const batchStartIndex = this.numBatchesTallied * batchSize 
 
         const currentResultsRootSalt = batchStartIndex === 0 ? BigInt(0) : this.resultRootSalts[batchStartIndex - batchSize]
+
+    }
+
+
+    /**
+     * Check whether there are any unprocessed messages
+     * @returns true if there are unprocessed messages, false otherwise
+     */
+    public hasUnprocessedMessages = (): boolean => {
+        const batchSize = this.batchSizes.messageBatchSize
+
+        // calculate how many batches there are based on the
+        // num of messages stored
+        let totalBatches =
+            this.messages.length <= batchSize ?
+                1 :
+                Math.floor(this.messages.length / batchSize)
+
+        // if there are any messages left over, add another batch
+        if (this.messages.length % batchSize !== 0) 
+            totalBatches++
+        
+        return this.numBatchesProcessed < totalBatches
+    }
+
+    /**
+     * @notice Allows to generate a new Key (msg type == 3)
+     * @param _message 
+     * @param _encPubKey
+     * @param _newStateIndex
+     */
+    public generateNewKey = (
+        _message: Message,
+        _encPubKey: PublicKey,
+        _newStateIndex: bigint 
+    ) => {
+        // validation 
+        assert(_message.msgType === BigInt(3), "Poll:generateNewKey: message type must be 3")
+        assert(
+            _encPubKey.rawPubKey[0] < SNARK_FIELD_SIZE && 
+            _encPubKey.rawPubKey[1] < SNARK_FIELD_SIZE,
+            "Poll:generateNewKey: public key must be less than SNARK_FIELD_SIZE"
+        )
+        for (const d of _message.data) 
+            assert(d < SNARK_FIELD_SIZE, "Poll:generateNewKey: data must be less than SNARK_FIELD_SIZE")
+
+        // save key and message
+        this.encPubKeys.push(_encPubKey)
+        this.messages.push(_message)
+
+        const messageLeaf = _message.hash(_encPubKey)
+        this.messageAq.enqueue(messageLeaf)
+        this.messageTree.insert(messageLeaf)
+
+        // decrypt the message and store the command 
+        const sharedKey = Keypair.genEcdhSharedKey(
+            this.coordinatorKeyPair.privKey,
+            _encPubKey
+        )
+
+        try {
+            const { command } = KCommand.decrypt(
+                _message,
+                sharedKey
+            )
+            command.setNewStateIndex(_newStateIndex)
+            this.numKeyGens++
+            this.commands.push(command)
+        } catch (error: any) {
+            // if there is an error decrypting, we add a empty command
+            const keyPair = new Keypair()
+            let command = new KCommand(keyPair.pubKey, BigInt(0), BigInt(0), [BigInt(0), BigInt(0)], [BigInt(0), BigInt(0)], BigInt(0))
+            this.commands.push(command)
+        }
+    }
+
+    /**
+     * @notice Save the key event event
+     * @param _keyHash - the hash of the key 
+     * @param _c1 
+     * @param _c2 
+     */
+    public processDeactivatedKeyEvent = (
+        _keyHash: bigint, 
+        _c1: bigint[],
+        _c2: bigint[]
+    ) => {
+        const deactivatedKeyEvent: DeactivatedKeyEvent = {
+            keyHash: _keyHash,
+            c1: _c1,
+            c2: _c2
+        }
+
+        this.deactivatedKeyEvents.push(deactivatedKeyEvent)
+    }
+
+    /**
+     * @notice Deactivate a key (msg type == 1)
+     * @param _message 
+     * @param _encPubKey 
+     */
+    public deactivateKey = (
+        _message: Message,
+        _encPubKey: PublicKey
+    ) => {
+        // validation 
+        assert(_message.msgType === BigInt(1), "Poll:deactivateKey: message type must be 1")
+        assert(
+            _encPubKey.rawPubKey[0] < SNARK_FIELD_SIZE && 
+            _encPubKey.rawPubKey[1] < SNARK_FIELD_SIZE,
+            "Poll:deactivateKey: public key must be less than SNARK_FIELD_SIZE"
+        )
+
+        for (const d of _message.data) 
+            assert(d < SNARK_FIELD_SIZE, "Poll:deactivateKey: data must be less than SNARK_FIELD_SIZE")
+
+        this.deactivationMessages.push(_message)
+
+        const messageHash = _message.hash(_encPubKey)
+
+        // update the chain hash 
+        this.deactivatedKeysChainHash = hash2([this.deactivatedKeysChainHash, messageHash])
+        
+        // store the enc pub key
+        this.deactivationEncPubKeys.push(_encPubKey)
+
+        // decrypt the message and store the Command 
+        const sharedKey = Keypair.genEcdhSharedKey(
+            this.coordinatorKeyPair.privKey,
+            _encPubKey
+        )
+
+        try {
+            const { command, signature } = PCommand.decrypt(
+                _message,
+                sharedKey
+            )
+
+            this.deactivationSignatures.push(signature)
+            this.deactivationCommands.push(command)
+        } catch (error: any) {
+            const keyPair = new Keypair()
+            const command = new PCommand(BigInt(1), keyPair.pubKey, BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0))
+            this.deactivationCommands.push(command)
+            this.deactivationSignatures.push({} as Signature)
+        }
+    }
+
+    /**
+     * Process the key deactivation messages
+     * @param {bigint} _seed 
+     */
+    public processDeactivationMessages = (_seed: bigint) => {
+        const maskingValues: bigint[] = []
+        const elGamalEnc: Ciphertext[][] = []
+        const deactivatedLeaves: DeactivatedKeyLeaf[] = []
+
+        // if we haven't copied the state yet from the maci instance
+        // then copy it
+        if (!this.stateCopied) this.copyStateFromMaci()
+
+        let mask = _seed 
+        let computedStateIndex = 0
+
+        const stateLeafPathElements: bigint[] = []
+        const currentStateLeaves: bigint[][] = []
+
+        // loop through all key deactivation messages
+        for (let i = 0; i < this.deactivationMessages.length; i++) {
+            const deactivationCommand = this.deactivationCommands[i]
+            const signature = this.deactivationSignatures[i]
+
+            // unwrap the command 
+            const {
+                stateIndex,
+                newPubKey,
+                voteOptionIndex,
+                newVoteWeight,
+                salt 
+            } = deactivationCommand
+
+            const stateIndexInt = parseInt(stateIndex.toString()) 
+            computedStateIndex = 
+                stateIndexInt > 0 && stateIndexInt < this.numSignUps 
+                ?
+                    stateIndexInt - 1
+                :
+                    -1
+
+            let pubKey: PublicKey
+            if (computedStateIndex !== -1) {
+                pubKey = this.stateLeaves[stateIndexInt].pubKey
+                stateLeafPathElements.push(this.stateTree.genMerklePath(stateIndexInt).pathElements)
+                currentStateLeaves.push(this.stateLeaves[stateIndexInt].asCircuitInputs())
+            } else {
+                // if the state index was 0 or greater than the number of signups
+                pubKey = new PublicKey([BigInt(0), BigInt(0)])
+                stateLeafPathElements.push(this.stateTree.genMerklePath(0).pathElements)
+                // push the blank state leaf
+                currentStateLeaves.push(this.stateLeaves[0].asCircuitInputs())
+            }
+
+            // verify that the deactivation message was correct
+            const status = 
+                // cmd type must be 1
+                deactivationCommand.cmdType === BigInt(1) &&
+                // there must be a signature
+                signature !== null &&
+                // the signature must be valid 
+                verifySignature(
+                    deactivationCommand.hash(),
+                    signature,
+                    pubKey.rawPubKey
+                )
+                // @todo check the following lines
+                // && newPubKey.rawPubKey[0].toString() == '0'
+                // && newPubKey.rawPubKey[1].toString() == '0'
+                // && voteOptionIndex.toString() == '0'
+                // && newVoteWeight.toString() == '0'
+
+            mask = hash2([mask, salt])
+            maskingValues.push(mask)
+
+            // encrypt the coordinator pub key, status and mask 
+            const [c1, c2] = elGamalEncryptBit(
+                this.coordinatorKeyPair.pubKey.rawPubKey,
+                status ? BigInt(1) : BigInt(0),
+                mask 
+            )
+
+            elGamalEnc.push([c1, c2])
+
+            // create the leaf
+            const deactivatedLeaf = new DeactivatedKeyLeaf(
+                pubKey,
+                c1, 
+                c2,
+                salt 
+            )
+            // store it and its hash 
+            this.deactivatedKeysTree.insert(deactivatedLeaf.hash())
+            deactivatedLeaves.push(deactivatedLeaf)
+        }
+
+        // pad the deactivation key array with empty keys
+        for (let i = this.deactivationEncPubKeys.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i++) 
+            this.deactivationEncPubKeys.push(new PublicKey([BigInt(0), BigInt(0)]))
+        
+        const deactivatedTreePathElements: any[] = [];
+        for (let i = 0; i < this.deactivationMessages.length; i += 1) {
+            const merklePath = this.deactivatedKeysTree.genMerklePath(i);
+            deactivatedTreePathElements.push(merklePath.pathElements);
+        }
+
+        // Pad deactivatedTreePathElements array
+        for (let i = this.deactivationMessages.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
+            deactivatedTreePathElements.push(this.stateTree.genMerklePath(0).pathElements)
+        }
+    
+        // Pad stateLeafPathElements array
+        for (let i = stateLeafPathElements.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
+            stateLeafPathElements.push(this.stateTree.genMerklePath(0).pathElements)
+        }
+    
+        // Pad currentStateLeaves array
+        for (let i = currentStateLeaves.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
+            currentStateLeaves.push(blankStateLeaf.asCircuitInputs())
+        }
+
+        // Pad deactivationMessages array
+        for (let i = this.deactivationMessages.length; i < this.msgQueueSizeForProcessDeactivationMessagesCircuit; i += 1) {
+            const padMask = genRandomSalt();
+            const [padc1, padc2] = elGamalEncryptBit(
+                this.coordinatorKeyPair.pubKey.rawPubKey,
+                BigInt(0),
+                padMask,
+            )
+
+            maskingValues.push(padMask);
+            elGamalEnc.push([padc1, padc2]);
+            this.deactivationMessages.push(new Message(BigInt(0), Array(10).fill(BigInt(0))))
+        }
+
+        const circuitInputs = stringifyBigInts({
+            coordPrivKey: this.coordinatorKeyPair.privKey.asCircuitInputs(),
+            coordPubKey: this.coordinatorKeyPair.pubKey.rawPubKey,
+            encPubKeys: this.deactivationEncPubKeys.map(k => k.asCircuitInputs()),
+            msgs: this.deactivationMessages.map(m => m.asCircuitInputs()),
+            deactivatedTreePathElements,
+            stateLeafPathElements: stateLeafPathElements,
+            currentStateLeaves: currentStateLeaves,
+            elGamalEnc,
+            maskingValues,
+            deactivatedTreeRoot: this.deactivatedKeysTree.root,
+            currentStateRoot: this.stateTree.root,
+            numSignUps: this.numSignUps,
+            chainHash: this.deactivatedKeysChainHash,
+            inputHash: sha256Hash([
+                this.deactivatedKeysTree.root,
+                this.numSignUps,
+                this.stateTree.root,
+                this.deactivatedKeysChainHash,
+            ]),
+        })
+
+        return { circuitInputs, deactivatedLeaves }
+    }   
+
+    /**
+     * Generate the circuit inputs for generating a new key 
+     * @param newPublicKey 
+     * @param deactivatedPrivateKey 
+     * @param deactivatedPublicKey 
+     * @param coordinatorPublicKey 
+     * @param stateIndex 
+     * @param newCreditBalance 
+     * @param salt 
+     */
+    public generateCircuitInputsForGenerateNewKey = (
+        newPublicKey: PublicKey,
+        deactivatedPrivateKey: PrivateKey,
+        deactivatedPublicKey: PublicKey,
+        coordinatorPublicKey: PublicKey,
+        stateIndex: bigint,
+        newCreditBalance: bigint,
+        salt: bigint,
+    ) => {
+        if (!this.stateCopied) this.copyStateFromMaci()
+
+        const deactivatedKeyHash = hash3([...deactivatedPublicKey.asArray(), salt])
+        const deactivatedKeyIndex = this.deactivatedKeyEvents.findIndex(d => d.keyHash.toString() == deactivatedKeyHash.toString())
+
+        if (deactivatedKeyIndex == -1) {
+            throw new Error('Poll:generateCircuitInputsForGenerateNewKey: deactivated key not found')
+        }
+
+        const deactivatedKeyEvent = this.deactivatedKeyEvents[deactivatedKeyIndex]
+
+        // @note in the original version it was fixed to 42 
+        const z = genRandomSalt()
+        // const z = BigInt(42)
+
+        const [c1r, c2r] = elGamalRerandomize(
+            coordinatorPublicKey.rawPubKey,
+            z,
+            deactivatedKeyEvent.c1,
+            deactivatedKeyEvent.c2
+        )
+
+        if (this.deactivatedKeysTree.nextIndex === 0) 
+            this.deactivatedKeyEvents.forEach(dke => {
+                const deactivatedLeafHash = hash5([dke.keyHash, ...dke.c1, ...dke.c2])
+                this.deactivatedKeysTree.insert(deactivatedLeafHash)
+            })
+        
+        const nullifier = hash2([BigInt(deactivatedPrivateKey.asCircuitInputs()), salt])
+
+        const kCommand: KCommand = new KCommand(
+            newPublicKey,
+            newCreditBalance,
+            nullifier,
+            c1r, 
+            c2r,
+            BigInt(this.pollId)
+        )
+
+        return kCommand.prepareValues(
+            deactivatedPrivateKey,
+            this.stateLeaves,
+            this.stateTree,
+            BigInt(this.numSignUps),
+            stateIndex,
+            salt,
+            coordinatorPublicKey,
+            this.deactivatedKeysTree,
+            BigInt(deactivatedKeyIndex),
+            z,
+            deactivatedKeyEvent.c1,
+            deactivatedKeyEvent.c2
+        )
 
     }
 
