@@ -1257,7 +1257,7 @@ export class Poll {
      * Checks whether the message acc queue was merged
      * @returns Whether the message acc queue was merged or not
      */
-    private isMessageAqMerged = (): boolean => {
+    public isMessageAqMerged = (): boolean => {
         return this.messageAq.getRoot(
             this.treeDepths.messageTreeDepth
         ) === this.messageTree.root

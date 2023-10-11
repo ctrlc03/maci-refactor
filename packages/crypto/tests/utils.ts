@@ -1,4 +1,5 @@
 import { AccQueue, IncrementalQuinTree } from "../src"
+import { expect } from "bun:test"
 
 export const calcDepthFromNumLeaves = (
     hashLength: number,

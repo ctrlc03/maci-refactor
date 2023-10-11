@@ -109,4 +109,5 @@ describe("MaciState", () => {
         maciState.stateAq.merge(STATE_TREE_DEPTH)
         expect(maciState.stateAq.getRoot(STATE_TREE_DEPTH)).toEqual(stateTree.root)
     })
+
 })
