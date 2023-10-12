@@ -42,13 +42,9 @@ export {
     decrypt,
     sign,
     verifySignature,
-    elGamalEncrypt,
-    elGamalDecrypt,
     curveToBit,
-    elGamalEncryptBit,
-    elGamalDecryptBit,
-    elGamalRerandomize,
-    babyJubAddPoint
+    babyJubAddPoint,
+    bitToCurve
 } from "./crypto"
 
 export { OptimisedMT as IncrementalQuinTree } from 'optimisedmt'

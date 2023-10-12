@@ -6,8 +6,8 @@ import {
 } from "./index"
 import { solidityPackedSha256 } from "ethers"
 import { babyJub, poseidon, poseidonEncrypt, poseidonDecrypt, eddsa } from 'circomlib'
-import createBlakeHash from "blake-hash"
-import * as ff from 'ffjavascript'
+import { blake2b } from "blakejs"
+import { utils, Scalar } from "ffjavascript"
 import {
     Ciphertext,
     EcdhSharedKey,
@@ -290,14 +290,13 @@ export const genRandomSalt = (): bigint => {
  * @param privKey A private key generated using genPrivKey()
  * @returns A BabyJub-compatible private key.
  */
+// @todo check this function 
 export const formatPrivKeyForBabyJub = (privKey: PrivKey) => {
     const sBuff = eddsa.pruneBuffer(
-        createBlakeHash("blake512").update(
-            bigInt2Buffer(privKey),
-        ).digest().slice(0,32)
+        blake2b(bigInt2Buffer(privKey)),
     )
-    const s = ff.utils.leBuff2int(sBuff)
-    return ff.Scalar.shr(s, 3)
+    const s = utils.leBuff2int(sBuff)
+    return Scalar.shr(s, 3)
 }
 
 /**
@@ -430,48 +429,11 @@ export const verifySignature = (
     return eddsa.verifyPoseidon(msg, signature, pubKey)
 }
 
-/** 
- * Perform encryption using ElGamal algorithm of message point M using randomness y
- * @param pubKey The public key to use for encryption.
- * @param m The message point to encrypt.
- * @param y The randomness to use for encryption.
- * @returns the cyphertext.
- */
-export const elGamalEncrypt = (
-    pubKey: PubKey, 
-    m: Point, 
-    y: BigInt
-): Ciphertext[] => {
-    const s = babyJub.mulPointEscalar(pubKey, y)
-    const c1 = babyJub.mulPointEscalar(babyJub.Base8, y)
-
-    const c2 = babyJub.addPoint(m, s)
-    return [c1, c2]
-}
-
-/**
- * Performs decryption of the message point encrypted using ElGamal encryption algorithm
- * @param privKey The private key to use for decryption.
- * @param c1 The first component of the cyphertext.
- * @param c2 The second component of the cyphertext.
- * @returns the plain text.
- */
-export const elGamalDecrypt = (
-    privKey: PrivKey, 
-    c1: Ciphertext, 
-    c2: Ciphertext
-): Point => {
-    const s = babyJub.mulPointEscalar(c1, formatPrivKeyForBabyJub(privKey))
-    const sInv = [SNARK_FIELD_SIZE - s[0], s[1]]
-    const m = babyJub.addPoint(c2, sInv)
-    return m
-}
-
 /**
  * Maps bit to a point on the curve
  * @returns the point.
  */
-const bitToCurve = (
+export const bitToCurve = (
     bit: BigInt
 ): Point => {
     switch(bit) {
@@ -499,68 +461,6 @@ export const curveToBit = (
     } else {
         throw new Error('Invalid point value')
     }
-}
-
-/** 
- * Perform encryption of a single bit using ElGamal algorithm using randomness y
- * @param pubKey The public key to use for encryption.
- * @param bit The bit to encrypt.
- * @param y The randomness to use for encryption.
- * @returns the cyphertext.
- */
-export const elGamalEncryptBit = (
-    pubKey: PubKey, 
-    bit: BigInt, 
-    y: BigInt,
-): Ciphertext[] => {
-    const m = bitToCurve(bit)
-    return elGamalEncrypt(pubKey, m, y)
-}
-
-/**
- * Performs decryption of the message point encrypted bit using ElGamal encryption algorithm
- * @param privKey The private key to use for decryption.
- * @param c1 The first component of the cyphertext.
- * @param c2 The second component of the cyphertext.
- * @returns the decrypted bit.
- */
-export const elGamalDecryptBit = (
-    privKey: PrivKey, 
-    c1: Ciphertext, 
-    c2: Ciphertext
-): bigint => {
-    const m = elGamalDecrypt(privKey, c1, c2)
-    return curveToBit(m)
-}
-
-/**
- * Performs re randomization of the cyphertext encrypted using ElGamal encryption algorithm
- * @param pubKey the public key to use for re randomization.
- * @param z the random scalar value
- * @param c1 the first part of the cyphertext
- * @param c2 the second part of the cyphertext
- * @returns the re-randomized cyphertext
- */
-export const elGamalRerandomize = (
-    pubKey: PubKey,
-    z: BigInt,
-    c1: BigInt[],
-    c2: BigInt[],
-): bigint[] => {
-    // c1' = z*G + c1
-    // c2' = pubKey * z + c2
-
-    const c1r = babyJub.addPoint(
-        babyJub.mulPointEscalar(babyJub.Base8, z),
-        c1
-    )
-
-    const c2r = babyJub.addPoint(
-        babyJub.mulPointEscalar(pubKey, z),
-        c2
-    )
-    
-    return [c1r, c2r]
 }
 
 /**

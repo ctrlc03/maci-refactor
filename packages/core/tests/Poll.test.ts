@@ -39,10 +39,6 @@ describe("Poll", () => {
 
     const poll = maciState.polls[pollId]
 
-    beforeAll(async () => {
-        await poll.initNullifiersTree()
-    })
-
     test("should have set the correct values upon instantiation", () => {
         const batchSizes =  {
             messageBatchSize: messageBatchSize,

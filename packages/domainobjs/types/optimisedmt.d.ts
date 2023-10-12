@@ -45,27 +45,4 @@ declare module 'optimisedmt' {
         static verifyMerklePath(_proof: MerkleProof, _hashFunc: (leaves: bigint[]) => bigint): any;
 
     }
-
-    export const SNARK_FIELD_SIZE: any;
-
-    export function genRandomSalt(): any;
-
-    export function hash16(elements: any): any;
-
-    export function hash2(elements: any): any;
-
-    export function hash3(elements: any): any;
-
-    export function hash4(elements: any): any;
-
-    export function hash5(elements: any): any;
-
-    export function hashArray(input: any): any;
-
-    export function poseidon(inputs: any): any;
-
-    export function stringifyBigInts(o: any): any;
-
-    export function unstringifyBigInts(o: any): any;
-
 }

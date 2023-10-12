@@ -26,7 +26,8 @@ export class MaciState {
     public stateAq: AccQueue
 
     public pollBeingProcessed: boolean = false 
-    public currentPollBeingProcessed: number 
+    // @todo this maybe should not be set to 0 but be undefined first?
+    public currentPollBeingProcessed: number = 0
     public numSignUps: number = 0 
 
     /**
