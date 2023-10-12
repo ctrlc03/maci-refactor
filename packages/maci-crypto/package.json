@@ -1,0 +1,22 @@
+{
+  "name": "maci-crypto",
+  "version": "1.1.2",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "blake-hash": "^2.0.0",
+    "circomlib": "https://github.com/weijiekoh/circomlib.git#24ed08eee0bb613b8c0135d66c1013bd9f78d50a",
+    "ethers": "^6.7.1",
+    "ffjavascript": "^0.2.60",
+    "optimisedmt": "^0.0.9"
+  },
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "ts-jest": "^29.1.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

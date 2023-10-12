@@ -1,10 +1,14 @@
 {
-  "name": "maci-refactor",
+  "name": "maci",
   "private": true,
+  "scripts": {
+    "docs": "typedoc --options typedoc.json"
+  },
   "workspaces": [
     "packages/*"
   ],
-  "dependencies": {
-    "circomlib": "https://github.com/weijiekoh/circomlib.git#24ed08eee0bb613b8c0135d66c1013bd9f78d50a"
+  "devDependencies": {
+    "bun-types": "^1.0.6",
+    "typedoc": "^0.25.2"
   }
 }

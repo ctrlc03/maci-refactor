@@ -1,0 +1,12 @@
+{
+    "entryPoints": ["packages/*"],
+    "name": "Minimal Anti Collusion Infrastructure (MACI)",
+    "entryPointStrategy": "packages",
+    "exclude": [
+      "**/emitter",
+      "**/eslint-config-custom",
+      "**/tsconfig",
+      "**/artifacts"
+    ],
+    "out": "packages/docs/typedocs/",
+  }
