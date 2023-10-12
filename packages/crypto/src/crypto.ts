@@ -6,7 +6,6 @@ import {
 } from "./index"
 import { solidityPackedSha256 } from "ethers"
 import { babyJub, poseidon, poseidonEncrypt, poseidonDecrypt, eddsa } from 'circomlib'
-import { blake2b } from "blakejs"
 import { utils, Scalar } from "ffjavascript"
 import {
     Ciphertext,
@@ -19,6 +18,7 @@ import {
     Keypair, 
     Signature
 } from "../types/types"
+import createBlakeHash from "blake-hash"
 
 /**
  * @notice A class representing a point on the first group (G1)
@@ -293,8 +293,9 @@ export const genRandomSalt = (): bigint => {
 // @todo check this function 
 export const formatPrivKeyForBabyJub = (privKey: PrivKey) => {
     const sBuff = eddsa.pruneBuffer(
-        blake2b(bigInt2Buffer(privKey)),
-    )
+        createBlakeHash("blake512").update(
+            bigInt2Buffer(privKey),
+        ).digest().slice(0,32))
     const s = utils.leBuff2int(sBuff)
     return Scalar.shr(s, 3)
 }
