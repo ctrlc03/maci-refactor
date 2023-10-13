@@ -35,9 +35,6 @@ contract MACI is Owned, IPubKey, Hasher, Params {
     /// @notice sign up deadline 
     uint256 public signUpDeadline;
 
-    /// @notice how long do users have to de-activate their keys
-    uint256 public deactivationPeriod;
-
     /// @notice track if the contract was initialized
     bool public isInitialized;
 
@@ -105,6 +102,13 @@ contract MACI is Owned, IPubKey, Hasher, Params {
 
     /**
      * @dev Initialize the contract
+     * @param _owner The owner of the contract
+     * @param _pollFactory The address of the PollFactory contract
+     * @param _vkFactory The address of the VkFactory contract
+     * @param _signUpGatekeeperFactory The address of the SignUpGatekeeperFactory contract
+     * @param _accQueueFactory The address of the AccQueueFactory contract
+     * @param _signUpPeriod The sign up period
+     * @param _topupCredit The address of the topup credit contract
      */
     function initialize(
         address _owner,
@@ -113,7 +117,6 @@ contract MACI is Owned, IPubKey, Hasher, Params {
         address _signUpGatekeeperFactory,
         address _accQueueFactory,
         uint256 _signUpPeriod,
-        uint256 _deactivationPeriod,
         address _topupCredit
     ) external {
         /// @notice cannot be init twice
@@ -150,10 +153,6 @@ contract MACI is Owned, IPubKey, Hasher, Params {
 
         // calculate the signup deadline
         signUpDeadline = block.timestamp + _signUpPeriod;
-        // deactivation period 
-        /// @dev do not use signUpDeadline but re calculate to save one read 
-        deactivationPeriod = block.timestamp + _signUpPeriod + _deactivationPeriod;
-
 
         // deploy the VkRegistry
         IVkRegistryFactory vkRegistryFactory = IVkRegistryFactory(_vkFactory);

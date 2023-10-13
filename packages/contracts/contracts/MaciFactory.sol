@@ -21,45 +21,28 @@ contract MaciFactory {
 
     // /**
     //  * @dev createNewInstance deploys a new MACI instance using the Clones library
-    //  * @param _messageProcessorAddress The address of the message processor contract
-    //  * @param _duration 
-    //  * @param _maxValues 
-    //  * @param _treeDepths 
-    //  * @param _batchSizes 
-    //  * @param _coordinatorPubKey 
-    //  * @param _vkRegistry 
-    //  * @param _maci 
-    //  * @param _topupCredit 
-    //  * @param _pollOwner 
-    //  * @return clone address
     //  */
     function createNewInstance(
-        address _messageProcessorAddress,
-        uint256 _duration,
-        uint256 _maxValues,
-        uint256 _treeDepths,
-        uint256 _batchSizes,
-        uint256 _coordinatorPubKey,
-        address _vkRegistry,
-        address _maci,
-        address _topupCredit,
-        address _pollOwner
+        address _owner,
+        uint256 _pollFactory,
+        uint256 _vkFactory,
+        uint256 _signUpGatekeeperFactory,
+        uint256 _accQueueFactory,
+        uint256 _signUpPeriod,
+        address _topupCredit
     ) public returns (address clone) {
         // Deploy
         clone = Clones.clone(maciTemplate);
         
         // Initialize
         IMaci(clone).initialize(
-            _messageProcessorAddress,
-            _duration,
-            _maxValues,
-            _treeDepths,
-            _batchSizes,
-            _coordinatorPubKey,
-            _vkRegistry,
-            _maci,
-            _topupCredit,
-            _pollOwner
+            _owner,
+            _pollFactory,
+            _vkFactory,
+            _signUpGatekeeperFactory,
+            _accQueueFactory,
+            _signUpPeriod,
+            _topupCredit
         );
 
         emit NewMaciDepoyed(clone);

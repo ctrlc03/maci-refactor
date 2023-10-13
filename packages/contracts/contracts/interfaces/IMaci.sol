@@ -17,17 +17,13 @@ interface IMaci {
     function numSignUps() external view returns (uint256);
     function stateAq() external view returns (AccQueue);
     function signUpDeadline() external view returns (uint40);
-    function deactivationPeriod() external view returns (uint40);
     function initialize(
-        address _messageProcessorAddress,
-        uint256 _duration,
-        uint256 _maxValues,
-        uint256 _treeDepths,
-        uint256 _batchSizes,
-        uint256 _coordinatorPubKey,
-        address _vkRegistry,
-        address _maci,
-        address _topupCredit,
-        address _pollOwner
+        address _owner,
+        uint256 _pollFactory,
+        uint256 _vkFactory,
+        uint256 _signUpGatekeeperFactory,
+        uint256 _accQueueFactory,
+        uint256 _signUpPeriod,
+        address _topupCredit
     ) external;
 }

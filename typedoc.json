@@ -1,0 +1,17 @@
+{
+    "entryPoints": [
+        "packages/crypto",
+        "packages/core", 
+        "packages/domainobjs",
+        "packages/cli"
+    ],
+    "name": "Minimal Anti Collusion Infrastructure (MACI)",
+    "entryPointStrategy": "packages",
+    "exclude": [
+      "**/emitter",
+      "**/eslint-config-custom",
+      "**/tsconfig",
+      "**/artifacts",
+      "./packages/contracts/*"
+    ]
+  }
