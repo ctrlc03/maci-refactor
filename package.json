@@ -4,7 +4,6 @@
   "scripts": {
     "docs": "typedoc --options typedoc.json",
     "lint": "eslint '*/**/*.ts'",
-    "lint:quiet": "eslint '*/**/*.ts' --quiet",
     "lint:fix": "eslint '*/**/*.ts' --fix --quiet"
   },
   "workspaces": [

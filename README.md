@@ -29,3 +29,8 @@ bun run docs
 ```
 
 ## Linting
+
+To lint the projects, please run:
+
+* `bun run lint` to see what needs to be fixed
+* `bun run lint:fix` to fix what can be fixed automatically
