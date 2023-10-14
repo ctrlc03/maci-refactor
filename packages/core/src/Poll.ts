@@ -408,7 +408,7 @@ export class Poll {
         const currentBallots: Ballot[] = []
         const currentBallotsPathElements: any[] = []
 
-        const currentVoteWeights: BigInt[] = []
+        const currentVoteWeights: bigint[] = []
         const currentVoteWeightsPathElements: any[] = []
 
         for (let i = 0; i < batchSize; i++) {

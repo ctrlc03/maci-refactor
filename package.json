@@ -2,13 +2,19 @@
   "name": "maci-refactor",
   "private": true,
   "scripts": {
-    "docs": "typedoc --options typedoc.json"
+    "docs": "typedoc --options typedoc.json",
+    "lint": "eslint '*/**/*.ts'",
+    "lint:quiet": "eslint '*/**/*.ts' --quiet",
+    "lint:fix": "eslint '*/**/*.ts' --fix --quiet"
   },
   "workspaces": [
     "packages/*"
   ],
   "dependencies": {
-    "circomlib": "https://github.com/weijiekoh/circomlib.git#24ed08eee0bb613b8c0135d66c1013bd9f78d50a"
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "circomlib": "https://github.com/weijiekoh/circomlib.git#24ed08eee0bb613b8c0135d66c1013bd9f78d50a",
+    "eslint": "^8.51.0"
   },
   "devDependencies": {
     "typedoc": "^0.25.2"

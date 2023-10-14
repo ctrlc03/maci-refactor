@@ -15,7 +15,7 @@ export interface Proof {
  */
 export interface IStateLeaf {
 	pubKey: PublicKey;
-	voiceCreditBalance: BigInt;
+	voiceCreditBalance: bigint;
 }
 
 /**

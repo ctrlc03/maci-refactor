@@ -35,7 +35,6 @@ describe("verifyingKey", () => {
     
     test("Copy should generate a deep copy", async () => {
         const j = await Bun.file(path.join(__dirname, 'artifacts/test_vk.json'), { type: "application/json"}).text()
-        const d = JSON.parse(j)
         const vk = VerifyingKey.fromJSON(j)
 
         const vk2 = vk.copy()

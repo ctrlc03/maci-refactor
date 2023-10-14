@@ -12,7 +12,7 @@ export const genTallyResultCommitment = (
    results: bigint[],
    salt: bigint,
    depth: number,
-): BigInt => {
+): bigint => {
     // create a new Quin Tree
     const tree = new IncrementalQuinTree(depth, BigInt(0), 5, hash5)
     // Fill with the results
