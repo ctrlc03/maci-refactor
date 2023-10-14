@@ -30,10 +30,6 @@ export {
 } from "./constants"
 
 export {
-	DeactivatedKeyLeaf
-} from "./deactivatedKey"
-
-export {
 	Command,
 	TCommand,
 	PCommand
