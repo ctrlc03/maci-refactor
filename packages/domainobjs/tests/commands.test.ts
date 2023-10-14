@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Keypair, Message, PCommand } from "../src"
+import { Keypair, Message, PCommand, TCommand } from "../src"
 import { genRandomSalt } from "../../crypto/src"
 
 describe("Commands & Messages", () => {
@@ -97,5 +97,21 @@ describe("Commands & Messages", () => {
         expect(arr[9]).toEqual(BigInt(10))
         expect(arr[10]).toEqual(BigInt(11))
         expect(arr).toBeArray()
+    })
+
+    describe("TCommand", () => {
+        const stateIndex = BigInt(0)
+        const amount = BigInt(100)
+        const pollId = BigInt(1)
+        const tCommand = new TCommand(
+            stateIndex,
+            amount,
+            pollId
+        )
+
+        test("copy should produce a deep copy", () => {
+            const c = tCommand.copy()
+            expect(c.equals(tCommand)).toBeTruthy()
+        })
     })
 })

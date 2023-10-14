@@ -16,9 +16,3 @@ export interface MaxValues {
     maxMessages: number
     maxVoteOptions: number
 }
-
-export interface DeactivatedKeyEvent {
-    keyHash: bigint
-    c1: bigint[]
-    c2: bigint[]
-}

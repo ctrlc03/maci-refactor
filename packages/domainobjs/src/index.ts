@@ -36,7 +36,6 @@ export {
 export {
 	Command,
 	TCommand,
-	KCommand,
 	PCommand
 } from "./commands"
 

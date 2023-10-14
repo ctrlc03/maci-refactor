@@ -2,12 +2,9 @@ import assert from "node:assert"
 import { 
     Ballot, 
     Command, 
-    DeactivatedKeyLeaf, 
-    KCommand, 
     Keypair,
     Message, 
     PCommand, 
-    PrivateKey, 
     PublicKey, 
     StateLeaf, 
     TCommand,
@@ -16,7 +13,6 @@ import {
 } from "../../domainobjs/src"
 import { 
     BatchSizes, 
-    DeactivatedKeyEvent, 
     MaxValues, 
     TreeDepths 
 } from "../types"
@@ -583,14 +579,7 @@ export class Poll {
             , 'Poll:genProcessMessagesCircuitInputsPartial: Invalid index'
         )
 
-        let msgs = this.messages.map((x, index) => x.asCircuitInputs().concat(
-            [
-                this.commands[index] instanceof KCommand ?
-                    (this.commands[index] as KCommand).newStateIndex :
-                    BigInt(0)
-            ]
-        ))
-
+        let msgs = this.messages.map((x) => x.asCircuitInputs())
         while (msgs.length % this.batchSizes.messageBatchSize > 0)
             msgs.push([...new Message(BigInt(1), Array(10).fill(BigInt(0))).asCircuitInputs(), BigInt(0)])
 

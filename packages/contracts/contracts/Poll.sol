@@ -13,9 +13,6 @@ import { EmptyBallotRoots } from "./trees/EmptyBallotRoots.sol";
  * @notice This contract allows users to submit votes 
  */
 contract Poll is Owned, Params, Utilities, EmptyBallotRoots {
-    /// @notice the hash of the deactivation chain
-    uint256 public deactivationChainHash = 8370432830353022751713833565135785980866757267633941821328460903436894336785;
-
     /// @notice track contract initialization
     /// to prevent double initialization
     bool public isInitialized;

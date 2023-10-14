@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { MaciState } from "../src/Maci"
 import { IncrementalQuinTree, NOTHING_UP_MY_SLEEVE, genKeypair, hash5 } from "../../crypto/src"
 import { Keypair, PCommand, PrivateKey, PublicKey } from "../../domainobjs/src"
