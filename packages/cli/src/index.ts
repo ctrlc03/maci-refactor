@@ -24,5 +24,6 @@ program
     .action(genMaciPubKey)
 program.command("genMaciKeyPair").description("generate a new MACI key pair").action(genKeyPair)
 program.command("deployPoll").description("deploy a new poll").action(() => {})
+program.command("topup").description("top up an account").action(() => {})
 
 program.parseAsync(process.argv)

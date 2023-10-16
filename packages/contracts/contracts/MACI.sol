@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { Owned } from "solmate/src/auth/Owned.sol";
 import { InitialVoiceCreditProxy } from "./voiceCredits/InitialVoiceCreditProxy.sol";
 import { VkRegistry } from "./VkRegistry.sol";
-import { IPubKey } from "./DomainObjs.sol";
+import { DomainObjs } from "./DomainObjs.sol";
 import { IPollFactory } from "./interfaces/IPollFactory.sol";
 import { IAccQueueFactory } from "./interfaces/IAccQueueFactory.sol";
 import { IAccQueue } from "./interfaces/IAccQueue.sol";
@@ -19,7 +19,7 @@ import { IPoll } from "./interfaces/IPoll.sol";
  * @title MACI
  * @dev Main contract which is used to create a new poll and send sign up messages
  */
-contract MACI is Owned, IPubKey, Hasher, Params {
+contract MACI is Owned, DomainObjs, Hasher, Params {
     /// @notice the dept of the state tree
     uint8 public constant stateTreeDepth = 10;
 
@@ -81,6 +81,7 @@ contract MACI is Owned, IPubKey, Hasher, Params {
     error LibrariesNotLinked();
     error PollDoesNotExist();
     error PollNotCompleted();
+    error TooManySignups();
 
     /// @notice Modifiers
     /// @dev allow a function to be called only after the contract has been initialized
@@ -213,6 +214,64 @@ contract MACI is Owned, IPubKey, Hasher, Params {
         polls[pollId] = IPoll(poll);
 
         emit PollDeployed(pollId, address(poll), _coordinatorPubKey);
+    }
+
+    /**
+     * Allows any eligible user sign up. The sign-up gatekeeper should prevent
+     * double sign-ups or ineligible users from doing so.  This function will
+     * only succeed if the sign-up deadline has not passed. It also enqueues a
+     * fresh state leaf into the state AccQueue.
+     * @param _publicKey The user's public key
+     * @param _signUpGatekeeperData Data to pass to the sign-up gatekeeper's
+     *     register() function. For instance, the POAPGatekeeper or
+     *     SignUpTokenGatekeeper requires this value to be the ABI-encoded
+     *     token ID. 
+     * @param _initialVoiceCreditProxyData Data to pass to the
+     *     InitialVoiceCreditProxy, which allows it to determine how many voice
+     *     credits this user should have.
+     */
+    function signUp(
+        IPubKey memory _publicKey,
+        bytes memory _signUpGatekeeperData,
+        bytes memory _initialVoiceCreditProxyData
+    ) external afterInit returns (uint256 stateIndex) {
+        // validation first
+        // cannot have more signups than the tree can hold
+        if (numSignUps >= uint256(STATE_TREE_ARITY) ** uint256(stateTreeDepth)) revert TooManySignups();
+        /// @notice we check that the pub key is valid
+        if (_publicKey.x >= SNARK_SCALAR_FIELD || _publicKey.y >= SNARK_SCALAR_FIELD) {
+            revert InvalidPubKey();
+        }
+
+        // increase the number of signups
+        // cannot overflow as we cannot process uint256.max in our circuits
+        unchecked {
+            numSignUps++;
+        }
+
+        /// @notice external call to the signup gatekeeper
+        /// @notice this should throw if the user is not elegible to signup
+        signUpGateKeeper.register(_signUpGatekeeperData);
+
+        // we calculate the user's voice credit balance
+        uint256 voiceCreditBalance = initialVoiceCreditProxy.getVoiceCredits(
+            msg.sender,
+            _initialVoiceCreditProxyData
+        );
+        
+        uint256 timestamp = block.timestamp;
+        // create a new state leaf and add it to the acc queue
+        uint256 stateLeaf = hashStateLeaf(
+            StateLeaf({
+                pubKey: _publicKey,
+                voiceCreditBalance: voiceCreditBalance,
+                timestamp: timestamp
+            })
+        )
+
+        stateIndex = stateAq.enqueue(stateLeaf);
+
+        emit SignUp(stateIndex, _publicKey, voiceCreditBalance, timestamp);
     }
 
     /**

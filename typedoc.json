@@ -15,4 +15,4 @@
       "./packages/contracts/*"
     ],
     "out": "./packages/docs/typedocs/",
-  }
+}

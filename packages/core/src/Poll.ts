@@ -386,6 +386,9 @@ export class Poll {
                 if (r === 0) this.currentMessageBatchIndex -= batchSize
                 else this.currentMessageBatchIndex -= r
             }
+
+            // @todo why are we putting a zero salt here
+            this.sbSalts[this.currentMessageBatchIndex] = BigInt(0)
         }
 
         // we want to ensure that the starting index is valid 
@@ -511,17 +514,6 @@ export class Poll {
                         throw error 
                     }
                     break 
-                case BigInt(3):
-                    try {
-
-                    } catch (error: any) {
-                        if (error.message === 'no-op') {
-                            // use a blank state leaf for invalid commands
-                        } else {
-                            throw error 
-                        }
-
-                    }
                 default: break 
             }
         }
@@ -533,11 +525,12 @@ export class Poll {
         circuitInputs.currentVoteWeights = currentVoteWeights
         circuitInputs.currentVoteWeightsPathElements = currentVoteWeightsPathElements
 
+        // increase the batch number as one batch was procesed
         this.numBatchesProcessed++
 
         if (this.currentMessageBatchIndex > 0) this.currentMessageBatchIndex -= batchSize 
 
-        // @todo currentSbSalt should not equal newSbSalt 
+        // @todo currentSbSalt should not equal newSbSalt (looks like we set BigInt(0) before)
         const newSbSalt = genRandomSalt()
         this.sbSalts[this.currentMessageBatchIndex] = newSbSalt
 
@@ -711,10 +704,10 @@ export class Poll {
             const ballot = this.ballots[Number(command.stateIndex)]
 
             // if the signature is not valid then throw an error
-            if (!command.verifySignature(signature, stateLeaf.pubKey)) throw new Error("TODO")
+            if (!command.verifySignature(signature, stateLeaf.pubKey)) throw new Error("no-op")
 
             // if the nonce is not valid, then throw
-            if (command.nonce !== ballot.nonce + BigInt(1)) throw new Error("TODO")
+            if (command.nonce !== ballot.nonce + BigInt(1)) throw new Error("no-op")
 
             // validate voice credits
             const prevSpentCred = ballot.votes[Number(command.voteOptionIndex)]
@@ -724,13 +717,14 @@ export class Poll {
             const voiceCreditsLeft = BigInt(100)
             // const voiceCreditsLeft = stateLeaf.voiceCreditBalance - prevSpentCre
             /*
+            // stateLeaf.voiceCreditBalance is the initial voice credit balance
             const voiceCreditsLeft =
                 BigInt(`${stateLeaf.voiceCreditBalance}`) +
                 (BigInt(`${prevSpentCred}`) * BigInt(`${prevSpentCred}`)) -
                 (BigInt(`${command.newVoteWeight}`) * BigInt(`${command.newVoteWeight}`))
             */
 
-            if (voiceCreditsLeft < BigInt(0)) throw new Error("TODO")
+            if (voiceCreditsLeft < BigInt(0)) throw new Error("no-op")
 
             // we need to check that the vote option is valid
             if (command.voteOptionIndex < BigInt(0) || command.voteOptionIndex >= this.maxValues.maxVoteOptions) throw new Error("no-op")

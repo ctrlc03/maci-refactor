@@ -101,6 +101,7 @@ export class MaciState {
         // increase number of signups recorded
         // @todo we need to validate that it's not > than supported
         // by the circuit params 
+        // @todo do we need to do it even though this is done on the smart contract level?
         this.numSignUps++
         // return the state index of the new signup
         return leafIndex
@@ -134,7 +135,7 @@ export class MaciState {
                 tallyBatchSize: this.stateTreeArity ** _treeDepths.intStateTreeDepth,
             }, // the batch sizes to process messages
             _maxValues, // the max values for the circuit params
-            this, // a reference to MaciState
+            this, // a reference to this MaciState instance
             this.polls.length // the id 
         )
 
