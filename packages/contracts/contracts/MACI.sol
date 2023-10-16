@@ -19,7 +19,7 @@ import { IPoll } from "./interfaces/IPoll.sol";
  * @title MACI
  * @dev Main contract which is used to create a new poll and send sign up messages
  */
-contract MACI is Owned, DomainObjs, Hasher, Params {
+contract MACI is Owned, Hasher, DomainObjs, Params {
     /// @notice the dept of the state tree
     uint8 public constant stateTreeDepth = 10;
 
@@ -73,6 +73,7 @@ contract MACI is Owned, DomainObjs, Hasher, Params {
     /// @notice Events 
     event Init(VkRegistry _vkRegistry);
     event PollDeployed(uint256 _pollId, address _pollAddress, PubKey _publicKey);
+    event SignUp(uint256 stateIndex, PubKey _publicKey, uint256 voiceCreditBalance, uint256 timestamp);
 
     /// @notice Errors
     error NotInitialized();
@@ -82,6 +83,7 @@ contract MACI is Owned, DomainObjs, Hasher, Params {
     error PollDoesNotExist();
     error PollNotCompleted();
     error TooManySignups();
+    error InvalidPubKey();
 
     /// @notice Modifiers
     /// @dev allow a function to be called only after the contract has been initialized
@@ -231,7 +233,7 @@ contract MACI is Owned, DomainObjs, Hasher, Params {
      *     credits this user should have.
      */
     function signUp(
-        IPubKey memory _publicKey,
+        PubKey memory _publicKey,
         bytes memory _signUpGatekeeperData,
         bytes memory _initialVoiceCreditProxyData
     ) external afterInit returns (uint256 stateIndex) {
@@ -251,7 +253,7 @@ contract MACI is Owned, DomainObjs, Hasher, Params {
 
         /// @notice external call to the signup gatekeeper
         /// @notice this should throw if the user is not elegible to signup
-        signUpGateKeeper.register(_signUpGatekeeperData);
+        signUpGateKeeper.register(msg.sender, _signUpGatekeeperData);
 
         // we calculate the user's voice credit balance
         uint256 voiceCreditBalance = initialVoiceCreditProxy.getVoiceCredits(
@@ -267,7 +269,7 @@ contract MACI is Owned, DomainObjs, Hasher, Params {
                 voiceCreditBalance: voiceCreditBalance,
                 timestamp: timestamp
             })
-        )
+        );
 
         stateIndex = stateAq.enqueue(stateLeaf);
 
